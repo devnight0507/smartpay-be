@@ -48,11 +48,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    # Run shutdown handlers
-    logger.info("Running shutdown event handlers")
-    for handler in shutdown_event_handlers:
-        await handler()
-
 
 def create_application() -> FastAPI:
     """

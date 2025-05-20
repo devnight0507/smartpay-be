@@ -122,6 +122,7 @@ async def client(
             yield db_session
         finally:
             pass
+
     # Apply all dependency overrides
     app.dependency_overrides[get_db_session] = override_get_db
 

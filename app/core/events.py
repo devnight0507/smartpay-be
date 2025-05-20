@@ -7,8 +7,9 @@ These functions are executed during application startup and shutdown.
 from typing import Callable, List
 
 from loguru import logger
-from app.core.config import settings
+
 from app.db.session import engine
+
 
 async def connect_to_db() -> None:
     """
