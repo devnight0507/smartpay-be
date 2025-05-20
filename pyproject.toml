@@ -35,6 +35,8 @@ passlib = { extras = ["bcrypt"], version = "1.7.4" }
 
 # Dev dependencies
 types-redis = "^4.6.0.20241004"
+types-passlib = "^1.7.7.20250516"
+python-multipart = "^0.0.20"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
 pytest-asyncio = "^0.23.8"

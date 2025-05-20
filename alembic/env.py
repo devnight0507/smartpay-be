@@ -13,7 +13,6 @@ from app.core.config import settings
 
 # Import all models here to ensure they're recognized by Alembic
 # These imports are needed for Alembic to detect models
-from app.db.models.item import Item  # noqa
 from app.db.session import Base
 
 # this is the Alembic Config object, which provides

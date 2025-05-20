@@ -2,12 +2,11 @@
 Database models.
 """
 
-from app.db.models.category import Category
-from app.db.models.item import Item, ItemStatus, ItemType
+from app.db.models.models import Transaction, User, VerificationCode, Wallet
 
 __all__ = [
-    "Category",
-    "Item",
-    "ItemStatus",
-    "ItemType",
+    "User",
+    "Wallet",
+    "Transaction",
+    "VerificationCode",
 ]

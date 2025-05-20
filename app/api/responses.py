@@ -212,7 +212,4 @@ class Tags:
     """API route tags for documentation grouping."""
 
     HEALTH = "Health"
-    ITEMS = "Items"
-    TAGS = "Tags"
     WEBSOCKETS = "WebSockets"
-    JOB_CONSUMER = "Job Consumer"
