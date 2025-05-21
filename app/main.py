@@ -56,6 +56,8 @@ def create_application() -> FastAPI:
     """
     configure_logging()
 
+    print("URI", settings.DATABASE_URI)
+
     application = FastAPI(
         title=settings.PROJECT_NAME,
         description=settings.PROJECT_DESCRIPTION,

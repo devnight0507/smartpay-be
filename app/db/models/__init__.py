@@ -1,12 +1,1 @@
-"""
-Database models.
-"""
-
-from app.db.models.models import Transaction, User, VerificationCode, Wallet
-
-__all__ = [
-    "User",
-    "Wallet",
-    "Transaction",
-    "VerificationCode",
-]
+from .models import User, Wallet, Transaction, VerificationCode  # noqa: F401

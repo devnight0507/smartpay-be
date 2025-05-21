@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from alembic import context
 from app.core.config import settings
 from app.db.session import Base
+from app.db.models import models  # noqa: F401
 
 # Fix PYTHONPATH so app.core.config is resolvable
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
