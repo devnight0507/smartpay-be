@@ -1,1 +1,1 @@
-from .models import User, Wallet, Transaction, VerificationCode  # noqa: F401
+from .models import Transaction, User, VerificationCode, Wallet  # noqa: F401
