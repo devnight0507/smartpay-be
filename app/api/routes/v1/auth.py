@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -15,6 +16,8 @@ from app.schemas.schemas import Token
 from app.schemas.schemas import User as UserSchema
 from app.schemas.schemas import UserCreate, VerificationRequest, VerificationResponse
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -24,7 +27,8 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Register a new user."""
-    # Check if user with email already exists
+    logger.warning("register!!")
+
     if user_in.email:
         query = select(User).where(User.email == user_in.email)
         result = await db.execute(query)

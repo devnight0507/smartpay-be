@@ -56,6 +56,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${ADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
+      POSTGRES_DB: smartpay_dev
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     ports:
