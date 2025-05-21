@@ -2285,6 +2285,18 @@ pycrypto = ["pyasn1", "pycrypto (>=2.6.0,<2.7.0)"]
 pycryptodome = ["pyasn1", "pycryptodome (>=3.3.1,<4.0.0)"]
 
 [[package]]
+name = "python-multipart"
+version = "0.0.20"
+description = "A streaming multipart parser for Python"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104"},
+    {file = "python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13"},
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 description = "YAML parser and emitter for Python"
@@ -2611,6 +2623,18 @@ files = [
 
 [package.dependencies]
 types-setuptools = "*"
+
+[[package]]
+name = "types-passlib"
+version = "1.7.7.20250516"
+description = "Typing stubs for passlib"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "types_passlib-1.7.7.20250516-py3-none-any.whl", hash = "sha256:0846c3d55e62a4a7e1a72094fb3e46d320cb42c4c8a817768d656955920edf73"},
+    {file = "types_passlib-1.7.7.20250516.tar.gz", hash = "sha256:f0175da758ab18b4e4c0859b735e7921992b8af95883694402a6bdb7a1c7cce7"},
+]
 
 [[package]]
 name = "types-pyopenssl"
@@ -3089,4 +3113,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.11"
-content-hash = "008075d05eaaa94956b13776dd14045f9c66596c92a101a0281a4e010578d0c9"
+content-hash = "24bf0d8cf8bd4ea3321575df64e18dd6000934ec75e8af5856628da64c4da31c"

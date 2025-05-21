@@ -17,7 +17,7 @@ from loguru import logger
 
 from app.api.dependencies import get_current_user
 from app.api.websockets import WebSocketMessage, websocket_manager
-from app.core.metrics import BUSINESS_EVENTS
+from app.db.models.models import User
 
 router = APIRouter()
 
@@ -81,9 +81,6 @@ async def websocket_notifications(
                     if topic:
                         websocket_manager.add_to_group(client_id, f"topic_{topic}")
 
-                        # Track subscription
-                        BUSINESS_EVENTS.labels(event_type="websocket_subscription").inc()
-
                         await websocket_manager.send_personal_message(
                             WebSocketMessage(
                                 type="notification", data={"message": f"Subscribed to {topic}", "topic": topic}
@@ -129,7 +126,7 @@ async def broadcast_notification(
     message: Dict[str, Any],
     topic: Optional[str] = None,
     user_id: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user()),
+    current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Broadcast a notification to WebSocket clients.
@@ -181,7 +178,7 @@ async def broadcast_notification(
 
 
 @router.get("/stats", response_model=Dict[str, Any])
-async def websocket_stats(current_user: Dict[str, Any] = Depends(get_current_user())) -> Dict[str, Any]:
+async def websocket_stats(current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """
     Get statistics about active WebSocket connections.
 

@@ -1,7 +1,3 @@
-"""
-Application configuration.
-"""
-
 from typing import Any, Optional
 
 from pydantic import PostgresDsn, RedisDsn, ValidationInfo, field_validator
@@ -28,9 +24,12 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     SECRET_KEY: str
 
-    # API Settings
-    API_PREFIX: str = "/api"
-    CORS_ORIGINS_STR: str = "*"
+    # Security Settings
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ALGORITHM: str = "HS256"
+
+    # API Versioning
+    API_V1_STR: str = "/api/v1"
 
     # Database Settings
     POSTGRES_SERVER: str
@@ -47,9 +46,6 @@ class Settings(BaseSettings):
             return v
 
         data = info.data
-        if not data:
-            raise ValueError("Missing data for DATABASE_URI")
-
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
             username=data.get("POSTGRES_USER"),
@@ -71,13 +67,8 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_redis_connection(cls, v: Optional[str], info: ValidationInfo) -> Any:
         data = info.data
-        if not data:
-            raise ValueError("Missing data for REDIS_URI")
-
-        # Skip if Redis is not enabled
         if not data.get("REDIS_ENABLED", True):
             return None
-
         if isinstance(v, str):
             return v
 
@@ -122,8 +113,11 @@ class Settings(BaseSettings):
     ENABLE_TRACING: bool = True
     OTLP_ENDPOINT: Optional[str] = None
 
+    # CORS
+    CORS_ORIGINS_STR: str = "*"
 
-# Provide required parameters as environment variables or hardcode for development
+
+# Create the singleton instance (override sensitive values here for local dev)
 settings = Settings(
     SECRET_KEY="development_secret_key",
     POSTGRES_SERVER="localhost",
