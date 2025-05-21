@@ -15,6 +15,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 
 from app.api.errors import register_exception_handlers
 from app.api.middleware import TranslationMiddleware
+from app.api.routes.v1.admin import router as admin_router
 from app.api.routes.v1.auth import router as auth_router
 from app.api.routes.v1.endpoints.errors import router as errors_router
 from app.api.routes.v1.endpoints.health import router as health_router
@@ -73,6 +74,8 @@ def create_application() -> FastAPI:
         openapi_tags=[
             {"name": "Health", "description": "Health check and readiness endpoints"},
             {"name": "Auth", "description": "Authentication"},
+            {"name": "Admin", "description": "Admin management"},
+            {"name": "Wallet", "description": "Wallet check"},
             {"name": "Errors", "description": "Error demonstration endpoints with i18n support"},
             {"name": "WebSockets", "description": "WebSocket connection and notification endpoints"},
         ],
@@ -106,6 +109,7 @@ def create_application() -> FastAPI:
     application.include_router(health_router, prefix="/api/health", tags=["Health"])
     application.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
     application.include_router(wallet_router, prefix="/api/v1/wallet", tags=["Wallet"])
+    application.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
     application.include_router(errors_router, prefix="/api/v1", tags=["Errors"])
     application.include_router(websocket_router, prefix="/api/v1/ws", tags=["WebSockets"])
 
