@@ -14,7 +14,6 @@ class UserBase(BaseModel):
     is_active: bool = True
     is_admin: bool = False
     is_verified: bool = False
-    verify_code: Optional[str] = None
 
     @validator("phone")
     def phone_must_be_valid(cls, v: Optional[str]) -> str | None:
@@ -52,6 +51,7 @@ class UserInDBBase(UserBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    verify_code: str
 
     class Config:
         """Pydantic config."""

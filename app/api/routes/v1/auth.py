@@ -52,7 +52,6 @@ async def register(
 
     # Create new user
     db_user = User(
-        fullname=user_in.fullname,
         email=user_in.email,
         phone=user_in.phone,
         hashed_password=get_password_hash(user_in.password),
@@ -70,12 +69,31 @@ async def register(
     await db.commit()
 
     # Create verification code
-    if user_in.email:
-        await create_verification_code(db, int(db_user.id), "email")
-    elif user_in.phone:
-        await create_verification_code(db, int(db_user.id), "phone")
+    # if user_in.email:
+    #     await create_verification_code(db, int(db_user.id), "email")
+    # elif user_in.phone:
+    #     await create_verification_code(db, int(db_user.id), "phone")
 
-    return db_user
+    # return db_user
+
+    if user_in.email:
+        verification = await create_verification_code(db, int(db_user.id), "email")
+    elif user_in.phone:
+        verification = await create_verification_code(db, int(db_user.id), "phone")
+    else:
+        verification = None
+
+    return {
+        "id": db_user.id,
+        "email": db_user.email,
+        "phone": db_user.phone,
+        "is_active": db_user.is_active,
+        "is_admin": db_user.is_admin,
+        "is_verified": db_user.is_verified,
+        "verify_code": verification.code if verification else None,
+        "created_at": db_user.created_at,
+        "updated_at": db_user.updated_at,
+    }
 
 
 @router.post("/login", response_model=Token)
