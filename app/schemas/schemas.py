@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, root_validator, validator
 
 
 # User schemas
@@ -15,22 +15,29 @@ class UserBase(BaseModel):
     is_admin: bool = False
     is_verified: bool = False
 
-    @validator("phone")
-    def phone_must_be_valid(cls, v: Optional[str]) -> str | None:
-        """Validate phone number format."""
-        if v is None:
-            return v
-        # Simple validation - in real app would be more robust
-        if not v.isdigit() or len(v) < 8:
-            raise ValueError("Phone number must contain only digits and be at least 8 digits")
+    @validator("email", pre=True)
+    def normalize_email(cls, v: Optional[str]) -> Optional[str]:
+        """Convert empty strings to None for email."""
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return None
         return v
 
-    @validator("email", "phone")
-    def email_or_phone_required(cls, v: Optional[str], values: Any) -> str | None:
-        """Validate that either email or phone is provided."""
-        if not v and not values.get("email") and not values.get("phone"):
-            raise ValueError("Either email or phone must be provided")
+    @validator("phone", pre=True)
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Convert empty strings to None for phone."""
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return None
         return v
+
+    @root_validator(skip_on_failure=True)
+    def email_or_phone_required(cls, values: dict) -> dict:
+        """Validate that either email or phone is provided."""
+        email = values.get("email")
+        phone = values.get("phone")
+
+        if not email and not phone:
+            raise ValueError("Either email or phone must be provided")
+        return values
 
 
 class UserCreate(UserBase):
@@ -51,7 +58,7 @@ class UserInDBBase(UserBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    verify_code: str
+    verify_code: Optional[str] = None
 
     class Config:
         """Pydantic config."""
@@ -132,7 +139,7 @@ class TransactionCreate(TransactionBase):
     recipient_identifier: str  # email or phone number
 
     @validator("amount")
-    def amount_must_be_positive(cls, v: int) -> int:
+    def amount_must_be_positive(cls, v: float) -> float:
         """Validate that amount is positive."""
         if v <= 0:
             raise ValueError("Amount must be positive")
