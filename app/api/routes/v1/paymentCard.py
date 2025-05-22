@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/payment-cards", response_model=List[PaymentCardResponse])
+@router.get("/", response_model=List[PaymentCardResponse])
 async def get_all_cards(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -49,7 +49,7 @@ async def get_all_cards(
     ]
 
 
-@router.post("/payment-cards", response_model=dict)
+@router.post("/", response_model=dict)
 async def add_new_card(
     card_in: PaymentCardCreate,
     db: AsyncSession = Depends(get_db),
@@ -123,7 +123,7 @@ async def add_new_card(
     return {"id": card_id, "message": "Card added successfully"}
 
 
-@router.patch("/payment-cards/{card_id}/default", response_model=MessageResponse)
+@router.patch("/{card_id}/default", response_model=MessageResponse)
 async def set_card_as_default(
     card_id: str,
     db: AsyncSession = Depends(get_db),
@@ -161,7 +161,7 @@ async def set_card_as_default(
     return {"message": "Card set as default"}
 
 
-@router.delete("/payment-cards/{card_id}", response_model=MessageResponse)
+@router.delete("/{card_id}", response_model=MessageResponse)
 async def delete_card(
     card_id: str,
     db: AsyncSession = Depends(get_db),
