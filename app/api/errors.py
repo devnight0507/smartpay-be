@@ -37,13 +37,20 @@ def register_exception_handlers(app: FastAPI) -> None:
         Handle validation errors and return a standardized response.
         """
         logger.warning(f"Validation error: {exc.errors()}")
+
+        def flatten_error(err: dict) -> str:
+            location = ".".join(str(loc) for loc in err.get("loc", []))
+            message = err.get("msg", "Validation error")
+            return f"{location}: {message}"
+
+        flat_errors = [flatten_error(err) for err in exc.errors()]
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "error": {
                     "code": "VALIDATION_ERROR",
                     "message": "Invalid request parameters",
-                    "details": {"errors": exc.errors()},
+                    "details": {"errors": " | ".join(flat_errors)},
                 }
             },
         )

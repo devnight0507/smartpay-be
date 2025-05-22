@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Main API service
   api:
@@ -17,7 +15,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: "service_healthy"
     networks:
       - backend-network
     healthcheck:
@@ -29,11 +27,12 @@ services:
 
   # PostgreSQL database
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: ./docker/postgres/Dockerfile
     container_name: smartpay-be-postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     env_file:
       - .env
     ports:
@@ -56,7 +55,6 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${ADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
-      POSTGRES_DB: smartpay_dev
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     ports:

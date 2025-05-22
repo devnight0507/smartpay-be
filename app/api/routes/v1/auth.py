@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -21,7 +22,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserSchema)
+@router.post(
+    "/register",
+    response_model=UserSchema,
+    summary="Register a new user.",
+)
 async def register(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
@@ -29,8 +34,20 @@ async def register(
     """Register a new user."""
     logger.warning("register!!")
 
-    if user_in.email:
-        query = select(User).where(User.email == user_in.email)
+    # Convert empty strings to None for proper NULL handling
+    email = user_in.email if user_in.email and user_in.email.strip() else None
+    phone = user_in.phone if user_in.phone and user_in.phone.strip() else None
+
+    # Validate that at least one of email or phone is provided
+    if not email and not phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either email or phone must be provided",
+        )
+
+    # Check if user with email already exists (only if email is provided)
+    if email:
+        query = select(User).where(User.email == email)
         result = await db.execute(query)
         user_by_email = result.scalars().first()
         if user_by_email:
@@ -39,9 +56,9 @@ async def register(
                 detail="A user with this email already exists",
             )
 
-    # Check if user with phone already exists
-    if user_in.phone:
-        query = select(User).where(User.phone == user_in.phone)
+    # Check if user with phone already exists (only if phone is provided)
+    if phone:
+        query = select(User).where(User.phone == phone)
         result = await db.execute(query)
         user_by_phone = result.scalars().first()
         if user_by_phone:
@@ -49,39 +66,33 @@ async def register(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A user with this phone already exists",
             )
-
-    # Create new user
+    user_id = str(uuid4())
+    # Create new user with proper None values
     db_user = User(
-        email=user_in.email,
-        phone=user_in.phone,
+        id=user_id,
+        email=email,  # Will be None if not provided
+        phone=phone,  # Will be None if not provided
         hashed_password=get_password_hash(user_in.password),
         is_active=True,
         is_admin=False,
         is_verified=False,
     )
+
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-
+    wallet_id = str(uuid4())
     # Create wallet for user
-    db_wallet = Wallet(user_id=db_user.id, balance=0.0)
+    db_wallet = Wallet(id=wallet_id, user_id=db_user.id, balance=0.0)
     db.add(db_wallet)
     await db.commit()
 
-    # Create verification code
-    # if user_in.email:
-    #     await create_verification_code(db, int(db_user.id), "email")
-    # elif user_in.phone:
-    #     await create_verification_code(db, int(db_user.id), "phone")
-
-    # return db_user
-
-    if user_in.email:
-        verification = await create_verification_code(db, int(db_user.id), "email")
-    elif user_in.phone:
-        verification = await create_verification_code(db, int(db_user.id), "phone")
-    else:
-        verification = None
+    # Create verification code based on what's available
+    verification = None
+    if email:
+        verification = await create_verification_code(db, str(db_user.id), "email")
+    elif phone:
+        verification = await create_verification_code(db, str(db_user.id), "phone")
 
     return {
         "id": db_user.id,
@@ -96,7 +107,11 @@ async def register(
     }
 
 
-@router.post("/login", response_model=Token)
+@router.post(
+    "/login",
+    response_model=Token,
+    summary="Login and get access token.",
+)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
@@ -120,6 +135,28 @@ async def login(
     access_token = create_access_token(subject=user.id, expires_delta=access_token_expires)
 
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get(
+    "/me",
+    summary="Get authenticated user information",
+)
+async def get_me(
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """Get current authenticated user information."""
+    logger.info(f"Getting user info for user ID: {current_user.id}")
+
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "phone": current_user.phone,
+        "is_active": current_user.is_active,
+        "is_admin": current_user.is_admin,
+        "is_verified": current_user.is_verified,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+    }
 
 
 @router.post("/verify/{verification_type}", response_model=VerificationResponse)
@@ -220,12 +257,12 @@ async def resend_verification(
             detail="User is already verified",
         )
 
-    await create_verification_code(db, int(current_user.id), verification_type)
+    await create_verification_code(db, str(current_user.id), verification_type)
 
     return {"message": f"Verification code sent via {verification_type}"}
 
 
-async def create_verification_code(db: AsyncSession, user_id: int, verification_type: str) -> VerificationCode:
+async def create_verification_code(db: AsyncSession, user_id: str, verification_type: str) -> VerificationCode:
     """Create a verification code."""
     import random
     import string
@@ -235,9 +272,10 @@ async def create_verification_code(db: AsyncSession, user_id: int, verification_
 
     # Set expiration time (1 hour)
     expires_at = datetime.utcnow() + timedelta(hours=1)
-
+    verification_id = str(uuid4())
     # Create verification code
     db_verification_code = VerificationCode(
+        id=verification_id,
         user_id=user_id,
         code=code,
         type=verification_type,
