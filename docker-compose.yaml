@@ -29,11 +29,12 @@ services:
 
   # PostgreSQL database
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: ./docker/postgres/Dockerfile
     container_name: smartpay-be-postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     env_file:
       - .env
     ports:
@@ -45,6 +46,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
 
   # PgAdmin for database management
   pgadmin:
