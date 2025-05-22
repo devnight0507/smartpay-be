@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, validator
 class UserBase(BaseModel):
     """Base user schema."""
 
+    fullname: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     is_active: bool = True

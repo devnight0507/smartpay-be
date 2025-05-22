@@ -52,6 +52,7 @@ async def register(
 
     # Create new user
     db_user = User(
+        fullname=user_in.fullname,
         email=user_in.email,
         phone=user_in.phone,
         hashed_password=get_password_hash(user_in.password),
@@ -85,6 +86,7 @@ async def register(
 
     return {
         "id": db_user.id,
+        "fullname": db_user.fullname,
         "email": db_user.email,
         "phone": db_user.phone,
         "is_active": db_user.is_active,
