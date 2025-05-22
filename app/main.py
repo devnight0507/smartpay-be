@@ -22,6 +22,7 @@ from app.api.routes.v1.endpoints.health import router as health_router
 from app.api.routes.v1.endpoints.websockets.notifications import (
     router as websocket_router,
 )
+from app.api.routes.v1.paymentCard import router as paymentCard_router
 from app.api.routes.v1.wallet import router as wallet_router
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -75,9 +76,10 @@ def create_application() -> FastAPI:
         },
         openapi_tags=[
             {"name": "Health", "description": "Health check and readiness endpoints"},
-            {"name": "Auth", "description": "Authentication"},
-            {"name": "Admin", "description": "Admin management"},
-            {"name": "Wallet", "description": "Wallet check"},
+            {"name": "Auth", "description": "Authentication endpoints"},
+            {"name": "Admin", "description": "Admin management endpoints"},
+            {"name": "Wallet", "description": "Wallet check endpoints"},
+            {"name": "Payment Card", "description": "Payment card endpoints"},
             {"name": "Errors", "description": "Error demonstration endpoints with i18n support"},
             {"name": "WebSockets", "description": "WebSocket connection and notification endpoints"},
         ],
@@ -112,6 +114,7 @@ def create_application() -> FastAPI:
     application.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
     application.include_router(wallet_router, prefix="/api/v1/wallet", tags=["Wallet"])
     application.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+    application.include_router(paymentCard_router, prefix="/api/v1/payment-cards", tags=["Payment Card"])
     application.include_router(errors_router, prefix="/api/v1", tags=["Errors"])
     application.include_router(websocket_router, prefix="/api/v1/ws", tags=["WebSockets"])
 

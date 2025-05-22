@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -21,7 +22,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserSchema)
+@router.post(
+    "/register",
+    response_model=UserSchema,
+    summary="Register a new user.",
+)
 async def register(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
@@ -61,9 +66,10 @@ async def register(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A user with this phone already exists",
             )
-
+    user_id = str(uuid4())
     # Create new user with proper None values
     db_user = User(
+        id=user_id,
         email=email,  # Will be None if not provided
         phone=phone,  # Will be None if not provided
         hashed_password=get_password_hash(user_in.password),
@@ -75,18 +81,18 @@ async def register(
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-
+    wallet_id = str(uuid4())
     # Create wallet for user
-    db_wallet = Wallet(user_id=db_user.id, balance=0.0)
+    db_wallet = Wallet(id=wallet_id, user_id=db_user.id, balance=0.0)
     db.add(db_wallet)
     await db.commit()
 
     # Create verification code based on what's available
     verification = None
     if email:
-        verification = await create_verification_code(db, int(db_user.id), "email")
+        verification = await create_verification_code(db, str(db_user.id), "email")
     elif phone:
-        verification = await create_verification_code(db, int(db_user.id), "phone")
+        verification = await create_verification_code(db, str(db_user.id), "phone")
 
     return {
         "id": db_user.id,
@@ -101,7 +107,11 @@ async def register(
     }
 
 
-@router.post("/login", response_model=Token)
+@router.post(
+    "/login",
+    response_model=Token,
+    summary="Login and get access token.",
+)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
@@ -127,7 +137,10 @@ async def login(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/me")
+@router.get(
+    "/me",
+    summary="Get authenticated user information",
+)
 async def get_me(
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
@@ -244,12 +257,12 @@ async def resend_verification(
             detail="User is already verified",
         )
 
-    await create_verification_code(db, int(current_user.id), verification_type)
+    await create_verification_code(db, str(current_user.id), verification_type)
 
     return {"message": f"Verification code sent via {verification_type}"}
 
 
-async def create_verification_code(db: AsyncSession, user_id: int, verification_type: str) -> VerificationCode:
+async def create_verification_code(db: AsyncSession, user_id: str, verification_type: str) -> VerificationCode:
     """Create a verification code."""
     import random
     import string
@@ -259,9 +272,10 @@ async def create_verification_code(db: AsyncSession, user_id: int, verification_
 
     # Set expiration time (1 hour)
     expires_at = datetime.utcnow() + timedelta(hours=1)
-
+    verification_id = str(uuid4())
     # Create verification code
     db_verification_code = VerificationCode(
+        id=verification_id,
         user_id=user_id,
         code=code,
         type=verification_type,

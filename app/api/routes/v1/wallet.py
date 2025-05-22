@@ -1,4 +1,5 @@
 from typing import Any, List
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc
@@ -64,8 +65,10 @@ async def top_up_wallet(
 
     # Update wallet balance
     setattr(wallet, "balance", float(wallet.balance) + top_up_data.amount)
+    transaction_id = str(uuid4())
     # Create transaction record
     transaction = Transaction(
+        id=transaction_id,
         sender_id=None,  # Top-up has no sender (external source)
         recipient_id=current_user.id,
         amount=top_up_data.amount,
@@ -143,8 +146,10 @@ async def transfer_money(
     setattr(sender_wallet, "balance", float(sender_wallet.balance) - transaction_data.amount)
     setattr(recipient_wallet, "balance", float(recipient_wallet.balance) + transaction_data.amount)
 
+    transaction_id = str(uuid4())
     # Create transaction record
     transaction = Transaction(
+        id=transaction_id,
         sender_id=current_user.id,
         recipient_id=recipient.id,
         amount=transaction_data.amount,

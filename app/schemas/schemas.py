@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, root_validator, validator
 
@@ -55,7 +56,7 @@ class UserUpdate(UserBase):
 class UserInDBBase(UserBase):
     """Base schema for user in DB."""
 
-    id: int
+    id: UUID
     created_at: datetime
     updated_at: datetime
     verify_code: Optional[str] = None
@@ -95,7 +96,7 @@ class WalletBase(BaseModel):
 class WalletCreate(WalletBase):
     """Schema for wallet creation."""
 
-    user_id: int
+    user_id: UUID
 
 
 class WalletUpdate(WalletBase):
@@ -107,8 +108,8 @@ class WalletUpdate(WalletBase):
 class WalletInDBBase(WalletBase):
     """Base schema for wallet in DB."""
 
-    id: int
-    user_id: int
+    id: UUID
+    user_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -155,7 +156,7 @@ class TopUpCreate(BaseModel):
 class TransactionInDBBase(TransactionBase):
     """Base schema for transaction in DB."""
 
-    id: int
+    id: UUID
     sender_id: Optional[int] = None
     recipient_id: Optional[int] = None
     status: str = "completed"  # "pending", "completed", "failed"
@@ -185,3 +186,139 @@ class VerificationResponse(BaseModel):
 
     message: str
     is_verified: bool
+
+
+# Transaction schemas
+class PaymentCardBase(BaseModel):
+    """Base payment card schema."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    cardNumber: str = Field(..., min_length=13, max_length=19)
+    expireDate: str = Field(..., pattern=r"^(0[1-9]|1[0-2])\/\d{2}$")  # MM/YY format
+    cvc: str = Field(..., min_length=3, max_length=4)
+    isDefault: bool = False
+    type: Optional[str] = None
+    cardColor: str = "bg-blue-500"
+
+    @validator("name", pre=True)
+    def normalize_name(cls, v: str) -> str:
+        """Normalize card name by stripping whitespace."""
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @validator("cardNumber", pre=True)
+    def normalize_card_number(cls, v: str) -> str:
+        """Remove spaces and normalize card number."""
+        if isinstance(v, str):
+            return "".join(v.split())
+        return v
+
+    @validator("expireDate")
+    def validate_expire_date(cls, v: str) -> str:
+        """Validate expire date format and future date."""
+        if not v:
+            raise ValueError("Expire date is required")
+
+        try:
+            month, year = v.split("/")
+            month_int = int(month)
+            year_int = int(year) + 2000  # Convert YY to YYYY
+
+            if month_int < 1 or month_int > 12:
+                raise ValueError("Invalid month")
+
+            # Check if date is in the future (basic validation)
+            from datetime import datetime
+
+            current_year = datetime.now().year
+            current_month = datetime.now().month
+
+            if year_int < current_year or (year_int == current_year and month_int < current_month):
+                raise ValueError("Card has expired")
+
+        except ValueError as e:
+            if "Invalid month" in str(e) or "Card has expired" in str(e):
+                raise e
+            raise ValueError("Invalid expire date format. Use MM/YY")
+
+        return v
+
+    @validator("cvc")
+    def validate_cvc(cls, v: str) -> str:
+        """Validate CVC is numeric."""
+        if not v.isdigit():
+            raise ValueError("CVC must be numeric")
+        return v
+
+
+class PaymentCardCreate(PaymentCardBase):
+    """Schema for payment card creation."""
+
+    pass
+
+
+class PaymentCardUpdate(BaseModel):
+    """Schema for payment card update."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    isDefault: Optional[bool] = None
+    cardColor: Optional[str] = None
+
+    @validator("name", pre=True)
+    def normalize_name(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize card name by stripping whitespace."""
+        if isinstance(v, str):
+            return v.strip() if v.strip() else None
+        return v
+
+
+class PaymentCardInDBBase(BaseModel):
+    """Base schema for payment card in DB."""
+
+    id: str
+    user_id: UUID
+    name: str
+    masked_card_number: str
+    expire_date: str
+    is_default: bool
+    card_type: str
+    card_color: str
+    is_deleted: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic config."""
+
+        orm_mode = True
+
+
+class PaymentCardResponse(BaseModel):
+    """Payment card schema for responses."""
+
+    id: str
+    name: str
+    cardNumber: str  # This will be the masked version
+    expireDate: str
+    cvc: str = "***"  # Always masked in response
+    isDefault: bool
+    type: str
+    cardColor: str
+
+    class Config:
+        """Pydantic config."""
+
+        orm_mode = True
+
+
+class PaymentCard(PaymentCardInDBBase):
+    """Payment card schema for responses with full DB data."""
+
+    pass
+
+
+class MessageResponse(BaseModel):
+    """Schema for simple message responses."""
+
+    message: str

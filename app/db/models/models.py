@@ -1,6 +1,7 @@
 from datetime import datetime
+from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
@@ -11,7 +12,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
     fullname = Column(String, nullable=True)
     email = Column(String, unique=True, index=True, nullable=True)
     phone = Column(String, unique=True, index=True, nullable=True)
@@ -31,6 +32,7 @@ class User(Base):
         foreign_keys="Transaction.recipient_id",
     )
     verification_codes = relationship("VerificationCode", back_populates="user")
+    payment_cards = relationship("PaymentCard", back_populates="user")
 
 
 class Wallet(Base):
@@ -38,8 +40,8 @@ class Wallet(Base):
 
     __tablename__ = "wallets"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     balance = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -53,9 +55,9 @@ class Transaction(Base):
 
     __tablename__ = "transactions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    sender_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    recipient_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    sender_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    recipient_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=True)
     type = Column(String, nullable=False)  # "transfer", "deposit", "withdrawal"
@@ -72,8 +74,8 @@ class VerificationCode(Base):
 
     __tablename__ = "verification_codes"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"))
     code = Column(String, nullable=False)
     type = Column(String, nullable=False)  # "email", "phone"
     expires_at = Column(DateTime, nullable=False)
@@ -82,3 +84,24 @@ class VerificationCode(Base):
 
     # Relationships
     user = relationship("User", back_populates="verification_codes")
+
+
+class PaymentCard(Base):
+    __tablename__ = "payment_cards"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    card_number_hash = Column(String(255), nullable=False)  # Hashed card number
+    masked_card_number = Column(String(50), nullable=False)  # Masked display version
+    expire_date = Column(String(5), nullable=False)  # MM/YY format
+    cvc_hash = Column(String(255), nullable=False)  # Hashed CVC
+    is_default = Column(Boolean, default=False, nullable=False)
+    card_type = Column(String(20), nullable=False)  # visa, mastercard, amex, etc.
+    card_color = Column(String(50), default="bg-blue-500", nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship
+    user = relationship("User", back_populates="payment_cards")
