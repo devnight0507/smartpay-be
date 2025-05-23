@@ -1,10 +1,10 @@
 services:
   # Main API service
-  api:
+  smartpay-api:
     build:
       context: .
       dockerfile: docker/Dockerfile.dev
-    container_name: smartpay-be-api
+    container_name: smartpay-api
     volumes:
       - ./:/app
       - ~/.ssh:/root/.ssh:ro  # SSH keys for private repositories
@@ -14,10 +14,10 @@ services:
       - .env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
-      postgres:
+      smartpay-postgres:
         condition: "service_healthy"
     networks:
-      - backend-network
+      - smartpay-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -26,19 +26,18 @@ services:
       start_period: 10s
 
   # PostgreSQL database
-  postgres:
-    build:
-      context: .
-      dockerfile: ./docker/postgres/Dockerfile
-    container_name: smartpay-be-postgres
+  smartpay-postgres:
+    image: postgres:15-alpine
+    container_name: smartpay-postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - smartpay_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     env_file:
       - .env
     ports:
       - "5432:5432"
     networks:
-      - backend-network
+      - smartpay-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -46,26 +45,26 @@ services:
       retries: 5
 
   # PgAdmin for database management
-  pgadmin:
+  smartpay-pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: smartpay-be-pgadmin
+    container_name: smartpay-pgadmin
     depends_on:
-      - postgres
+      - smartpay-postgres
     environment:
       PGADMIN_DEFAULT_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${ADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - smartpay_pgadmin_data:/var/lib/pgadmin
     ports:
       - "5050:80"
     networks:
-      - backend-network
+      - smartpay-network
 
 networks:
-  backend-network:
+  smartpay-network:
     driver: bridge
 
 volumes:
-  postgres_data:
-  pgadmin_data:
+  smartpay_postgres_data:
+  smartpay_pgadmin_data:

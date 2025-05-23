@@ -4,7 +4,9 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -70,6 +72,7 @@ async def register(
     # Create new user with proper None values
     db_user = User(
         id=user_id,
+        fullname=user_in.fullname,
         email=email,  # Will be None if not provided
         phone=phone,  # Will be None if not provided
         hashed_password=get_password_hash(user_in.password),
@@ -96,6 +99,7 @@ async def register(
 
     return {
         "id": db_user.id,
+        "fullname": db_user.fullname,
         "email": db_user.email,
         "phone": db_user.phone,
         "is_active": db_user.is_active,
@@ -291,3 +295,51 @@ async def create_verification_code(db: AsyncSession, user_id: str, verification_
     print(f"Verification code for user {user_id}: {code}")
 
     return db_verification_code
+
+
+@router.get(
+    "/{username}",
+    summary="Get User by user email or phone",
+)
+async def get_user(
+    username: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """Get User by user email or phone"""
+
+    query = select(User).where(or_(User.email == username, User.phone == username))
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                "error": {
+                    "code": "Not Found",
+                    "message": f"User Not Found : {username}",
+                }
+            },
+        )
+    elif user.is_verified is False:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "error": {
+                    "code": "Permission Denied.",
+                    "message": f"User Not Verified : {username}",
+                }
+            },
+        )
+    else:
+        return {
+            "id": user.id,
+            "fullname": user.fullname,
+            "email": user.email,
+            "phone": user.phone,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at,
+        }
