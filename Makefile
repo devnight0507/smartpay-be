@@ -2,7 +2,7 @@
 
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
-SERVICE := api
+SERVICE := smartpay-api
 ALEMBIC := alembic
 
 help:
