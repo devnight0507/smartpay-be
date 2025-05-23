@@ -59,6 +59,7 @@ class Transaction(Base):
     sender_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     recipient_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     amount = Column(Float, nullable=False)
+    card_id = Column(String, nullable=True)
     description = Column(String, nullable=True)
     type = Column(String, nullable=False)  # "transfer", "deposit", "withdrawal"
     status = Column(String, default="completed")  # "pending", "completed", "failed"

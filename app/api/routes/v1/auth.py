@@ -261,9 +261,9 @@ async def resend_verification(
             detail="User is already verified",
         )
 
-    await create_verification_code(db, str(current_user.id), verification_type)
+    verification = await create_verification_code(db, str(current_user.id), verification_type)
 
-    return {"message": f"Verification code sent via {verification_type}"}
+    return {"message": f"Verification code sent via {verification_type}", "verification_code": verification.code}
 
 
 async def create_verification_code(db: AsyncSession, user_id: str, verification_type: str) -> VerificationCode:

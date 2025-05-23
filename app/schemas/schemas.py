@@ -110,6 +110,7 @@ class WalletInDBBase(WalletBase):
 
     id: UUID
     user_id: UUID
+    card_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -151,14 +152,17 @@ class TopUpCreate(BaseModel):
     """Schema for deposit/top-up creation."""
 
     amount: float = Field(..., gt=0)
+    card_id: UUID
 
 
 class TransactionInDBBase(TransactionBase):
     """Base schema for transaction in DB."""
 
     id: UUID
-    sender_id: Optional[int] = None
-    recipient_id: Optional[int] = None
+    sender_id: Optional[str] = None
+    recipient_id: Optional[str] = None
+    type: str  # "deposit", "transtfer", "withdraw", "receive"
+    card_id: Optional[str] = None
     status: str = "completed"  # "pending", "completed", "failed"
     created_at: datetime
 

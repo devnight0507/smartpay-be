@@ -40,7 +40,7 @@ async def get_balance(
     return wallet
 
 
-@router.post("/top-up", response_model=WalletSchema)
+@router.post("/deposit", response_model=WalletSchema)
 async def top_up_wallet(
     top_up_data: TopUpCreate,
     db: AsyncSession = Depends(get_db),
@@ -72,6 +72,7 @@ async def top_up_wallet(
         sender_id=None,  # Top-up has no sender (external source)
         recipient_id=current_user.id,
         amount=top_up_data.amount,
+        card_id=top_up_data.card_id,
         type="deposit",
         status="completed",
     )
@@ -163,6 +164,54 @@ async def transfer_money(
     await db.refresh(transaction)
 
     return transaction
+
+
+@router.post("/withdraw", response_model=WalletSchema, summary="Withdraw Money")
+async def withdraw_wallet(
+    withdraw: TopUpCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_verified_user),
+) -> Any:
+    """Withdraw (simulated)."""
+    if withdraw.amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Amount must be positive",
+        )
+
+    query = select(Wallet).where(Wallet.user_id == current_user.id)
+    result = await db.execute(query)
+    wallet = result.scalars().first()
+
+    if not wallet:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wallet not found",
+        )
+    if wallet.balance < withdraw.amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Insufficient balance",
+        )
+    # Update wallet balance
+    setattr(wallet, "balance", float(wallet.balance) - withdraw.amount)
+    transaction_id = str(uuid4())
+    # Create transaction record
+    transaction = Transaction(
+        id=transaction_id,
+        sender_id=None,  # Top-up has no sender (external source)
+        recipient_id=current_user.id,
+        amount=withdraw.amount,
+        card_id=withdraw.card_id,
+        type="withdraw",
+        status="completed",
+    )
+
+    db.add(transaction)
+    await db.commit()
+    await db.refresh(wallet)
+
+    return wallet
 
 
 @router.get("/transactions", response_model=List[TransactionSchema])
