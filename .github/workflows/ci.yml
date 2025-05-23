@@ -9,7 +9,7 @@ on:
     branches: [main, develop]
 
 jobs:
-  quailty:
+  lint:
     name: Lint and Type Check
     runs-on: ubuntu-latest
     steps:
