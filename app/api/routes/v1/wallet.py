@@ -47,12 +47,6 @@ async def top_up_wallet(
     current_user: User = Depends(get_current_verified_user),
 ) -> Any:
     """Top up wallet (simulated)."""
-    if top_up_data.amount <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Amount must be positive",
-        )
-
     query = select(Wallet).where(Wallet.user_id == current_user.id)
     result = await db.execute(query)
     wallet = result.scalars().first()
@@ -90,12 +84,6 @@ async def transfer_money(
     current_user: User = Depends(get_current_verified_user),
 ) -> Any:
     """Transfer money to another user."""
-    if transaction_data.amount <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Amount must be positive",
-        )
-
     # Get sender's wallet
     query = select(Wallet).where(Wallet.user_id == current_user.id)
     result = await db.execute(query)

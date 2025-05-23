@@ -42,6 +42,7 @@ test_async_session = sessionmaker(
     autoflush=False,
 )
 
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def prepare_test_db() -> AsyncGenerator[None, None]:
     """
@@ -132,6 +133,7 @@ async def client(
     """
     Create a test client for the FastAPI application.
     """
+
     async def override_get_db():
         try:
             yield db_session

@@ -157,8 +157,8 @@ class TransactionInDBBase(TransactionBase):
     """Base schema for transaction in DB."""
 
     id: UUID
-    sender_id: Optional[int] = None
-    recipient_id: Optional[int] = None
+    sender_id: Optional[str] = None
+    recipient_id: Optional[str] = None
     status: str = "completed"  # "pending", "completed", "failed"
     created_at: datetime
 
