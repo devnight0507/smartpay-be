@@ -22,7 +22,7 @@ from app.main import app
 TEST_DATABASE_NAME = "smartpay_test"
 
 TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL", f"postgresql+asyncpg://postgres:postgres@smartpay-postgres:5432/{TEST_DATABASE_NAME}"
+    "TEST_DATABASE_URL", f"postgresql+asyncpg://postgres:postgres@smartpay-postgres-dev:5432/{TEST_DATABASE_NAME}"
 )
 
 # Disable tracing for tests
@@ -48,7 +48,7 @@ async def prepare_test_db() -> AsyncGenerator[None, None]:
     """
     Create the test database before tests run, and drop it after tests.
     """
-    admin_dsn = os.getenv("TEST_ADMIN_DSN", "postgresql://postgres:postgres@smartpay-postgres:5432/postgres")
+    admin_dsn = os.getenv("TEST_ADMIN_DSN", "postgresql://postgres:postgres@smartpay-postgres-dev:5432/postgres")
 
     conn = await asyncpg.connect(dsn=admin_dsn)
     try:

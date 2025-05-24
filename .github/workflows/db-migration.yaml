@@ -1,10 +1,10 @@
-name: Run DB Migrations on VPS
+name: DB Migrations on VPS
 
 on:
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
-  test-db-migrations:
+  db-migrate:
     name: Run Migration on VPS
     runs-on: ubuntu-latest
 
@@ -24,18 +24,17 @@ jobs:
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST << 'EOF'
             echo "📥 Pulling latest code..."
-            ${{ secrets.VPS_DEPLOY_PATH }}
-            cd
+            cd ${{ secrets.VPS_DEPLOY_PATH }}
             git pull origin main
 
             echo "🐳 Restarting containers..."
             docker-compose down
-            docker-compose up -d smartpay-postgres
+            docker-compose up -d smartpay-postgres-prod
             sleep 5
-            docker-compose up -d smartpay-api
+            docker-compose up -d smartpay-api-prod
 
             echo "📦 Running migrations..."
-            docker-compose exec smartpay-api sh -c "python manage.py migrate_all"
+            docker-compose exec smartpay-api-prod sh -c "python manage.py migrate_all"
           EOF
 
       - name: Notify Telegram - Migration Success
@@ -43,7 +42,7 @@ jobs:
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="✅ *SmartPay Migration Succeeded*\nRepo: \`${{ github.repository }}\`\n🔗 [View Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d text="✅ *SmartPay Migration Succeeded*\n📦 Tag: \`${{ github.ref_name }}\`\n🔗 [Run Link]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
             -d parse_mode=Markdown
 
       - name: Notify Telegram - Migration Failed
@@ -51,5 +50,5 @@ jobs:
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="❌ *SmartPay Migration Failed*\nRepo: \`${{ github.repository }}\`\n🔗 [View Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d text="❌ *SmartPay Migration Failed*\n📦 Tag: \`${{ github.ref_name }}\`\n🔗 [Run Link]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
             -d parse_mode=Markdown

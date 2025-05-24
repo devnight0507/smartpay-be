@@ -10,6 +10,9 @@ on:
       - 'environment/stage/values.yaml'
 
 jobs:
+  db-migrations:
+      uses: ./.github/workflows/db-migration.yaml
+      secrets: inherit
   deploy:
     runs-on: ubuntu-latest
 
