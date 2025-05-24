@@ -93,6 +93,51 @@ class WalletBase(BaseModel):
     balance: float = 0.0
 
 
+class SimpleUser(BaseModel):
+    """Lightweight user schema for transaction context."""
+
+    id: UUID
+    fullname: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+
+class SimplePaymentCard(BaseModel):
+    """Minimal card data for transaction reference."""
+
+    id: str
+    masked_card_number: str
+    card_type: str
+    card_color: str
+
+    class Config:
+        orm_mode = True
+
+
+class TransactionWithUsers(BaseModel):
+    """Transaction schema with sender and recipient data."""
+
+    id: UUID
+    sender_id: Optional[UUID] = None
+    recipient_id: Optional[UUID] = None
+    amount: float
+    description: Optional[str] = None
+    type: str  # "transfer", "deposit", "withdrawal"
+    card_id: Optional[UUID] = None
+    status: str = "completed"
+    created_at: datetime
+
+    sender: Optional[SimpleUser] = None
+    recipient: Optional[SimpleUser] = None
+    card: Optional[SimplePaymentCard] = None
+
+    class Config:
+        orm_mode = True
+
+
 class WalletCreate(WalletBase):
     """Schema for wallet creation."""
 
@@ -110,7 +155,6 @@ class WalletInDBBase(WalletBase):
 
     id: UUID
     user_id: UUID
-    card_id: UUID
     created_at: datetime
     updated_at: datetime
 
@@ -159,10 +203,10 @@ class TransactionInDBBase(TransactionBase):
     """Base schema for transaction in DB."""
 
     id: UUID
-    sender_id: Optional[str] = None
-    recipient_id: Optional[str] = None
+    sender_id: Optional[UUID] = None
+    recipient_id: Optional[UUID] = None
     type: str  # "deposit", "transtfer", "withdraw", "receive"
-    card_id: Optional[str] = None
+    card_id: Optional[UUID] = None
     status: str = "completed"  # "pending", "completed", "failed"
     created_at: datetime
 
@@ -326,3 +370,44 @@ class MessageResponse(BaseModel):
     """Schema for simple message responses."""
 
     message: str
+
+
+class NotificationBase(BaseModel):
+    """Base notification schema."""
+
+    title: str
+    message: str
+    type: str  # e.g. "payment_received_email", "payment_received_phone", "system_notification"
+    is_read: bool = False
+
+
+class NotificationCreate(NotificationBase):
+    """Schema for notification creation."""
+
+    user_id: UUID
+
+
+class NotificationInDBBase(NotificationBase):
+    """Base schema for notification in DB."""
+
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class NotificationSettings(BaseModel):
+    transaction_received_email: bool = True
+    transaction_received_phone: bool = True
+    system_messages: bool = True
+
+    class Config:
+        orm_mode = True
+
+
+class NotificationSettingsUpdate(BaseModel):
+    transaction_received_email: bool = True
+    transaction_received_phone: Optional[bool]
+    system_messages: Optional[bool]

@@ -13,7 +13,13 @@ from sqlalchemy.future import select
 from app.api.dependencies import authenticate_user, get_current_active_user
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
-from app.db.models.models import User, VerificationCode, Wallet
+from app.db.models.models import (
+    Notification,
+    User,
+    UserNotificationSetting,
+    VerificationCode,
+    Wallet,
+)
 from app.db.session import get_db
 from app.schemas.schemas import Token
 from app.schemas.schemas import User as UserSchema
@@ -88,6 +94,17 @@ async def register(
     # Create wallet for user
     db_wallet = Wallet(id=wallet_id, user_id=db_user.id, balance=0.0)
     db.add(db_wallet)
+    await db.commit()
+
+    # Create default notification setting and welcome notification
+    notification_setting = UserNotificationSetting(user_id=db_user.id)
+    welcome = Notification(
+        user_id=db_user.id,
+        title="Welcome to SmartPay",
+        message="Thanks for joining! Set your preferences in the notification tab.",
+        type="system_messages",
+    )
+    db.add_all([notification_setting, welcome])
     await db.commit()
 
     # Create verification code based on what's available

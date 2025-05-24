@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import (
     get_current_verified_user,
@@ -15,7 +16,7 @@ from app.db.models.models import Transaction, User, Wallet
 from app.db.session import get_db
 from app.schemas.schemas import TopUpCreate
 from app.schemas.schemas import Transaction as TransactionSchema
-from app.schemas.schemas import TransactionCreate
+from app.schemas.schemas import TransactionCreate, TransactionWithUsers
 from app.schemas.schemas import Wallet as WalletSchema
 
 router = APIRouter()
@@ -72,7 +73,7 @@ async def top_up_wallet(
         sender_id=None,  # Top-up has no sender (external source)
         recipient_id=current_user.id,
         amount=top_up_data.amount,
-        card_id=top_up_data.card_id,
+        card_id=str(top_up_data.card_id),
         type="deposit",
         status="completed",
     )
@@ -202,7 +203,7 @@ async def withdraw_wallet(
         sender_id=None,  # Top-up has no sender (external source)
         recipient_id=current_user.id,
         amount=withdraw.amount,
-        card_id=withdraw.card_id,
+        card_id=str(withdraw.card_id),
         type="withdraw",
         status="completed",
     )
@@ -214,20 +215,26 @@ async def withdraw_wallet(
     return wallet
 
 
-@router.get("/transactions", response_model=List[TransactionSchema])
+@router.get("/transactions", response_model=List[TransactionWithUsers])
 async def get_transactions(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_verified_user),
 ) -> Any:
-    """Get user's transactions."""
+    """Get user's transactions with populated sender and recipient data."""
+
     query = (
         select(Transaction)
         .where((Transaction.sender_id == current_user.id) | (Transaction.recipient_id == current_user.id))
         .order_by(desc(Transaction.created_at))
         .offset(offset)
         .limit(limit)
+        .options(
+            # Auto-fetch sender and recipient user objects
+            selectinload(Transaction.sender),
+            selectinload(Transaction.recipient),
+        )
     )
 
     result = await db.execute(query)
