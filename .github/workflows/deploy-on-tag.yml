@@ -49,11 +49,6 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
-      - name: Sync .env file (optional)
-        if: secrets.ENV_FILE_CONTENT != ''
-        run: |
-          echo "${{ secrets.ENV_FILE_CONTENT }}" | ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > ${{ secrets.VPS_DEPLOY_PATH }}/.env"
-
       - name: Run Deployment Script on VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd ${{ secrets.VPS_DEPLOY_PATH }} && ./deploy.sh"
