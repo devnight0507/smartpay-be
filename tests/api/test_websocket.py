@@ -1,114 +1,143 @@
-"""
-Tests for the WebSocket API.
-"""
-
-import asyncio
 import json
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
-from httpx import AsyncClient
+from fastapi import WebSocketDisconnect
 
-from app.api.websockets import WebSocketMessage, websocket_manager
-from app.db.session import AsyncSession
-
-pytestmark = pytest.mark.asyncio
+from app.api.websockets import ConnectionManager, WebSocketMessage
 
 
-class MockWebSocket:
-    """Mock WebSocket class for testing."""
-
-    def __init__(self) -> None:
-        self.accepted = False
-        self.closed = False
-        self.close_code: int | None = None
-        self.sent_messages: list[str] = []
-        self.receive_queue: asyncio.Queue[str] = asyncio.Queue()
-
-    async def accept(self) -> None:
-        self.accepted = True
-
-    async def close(self, code: int = 1000) -> None:
-        self.closed = True
-        self.close_code = code
-
-    async def send_text(self, data: str) -> None:
-        self.sent_messages.append(data)
-
-    async def receive_text(self) -> str:
-        return await self.receive_queue.get()
-
-    def add_receive_message(self, message: str) -> None:
-        self.receive_queue.put_nowait(message)
+@pytest.mark.asyncio
+async def test_websocket_message_validation_pass():
+    msg = WebSocketMessage(type="message", data={"text": "hi"})
+    assert msg.type == "message"
+    assert isinstance(msg.message_id, str)
 
 
-async def test_websocket_connection_manager() -> None:
-    """Test the WebSocket connection manager."""
-    # Create mock WebSockets
-    ws1 = MockWebSocket()
-    ws2 = MockWebSocket()
-
-    # Connect clients
-    client_id1 = await websocket_manager.connect(ws1)
-    client_id2 = await websocket_manager.connect(ws2)
-
-    # Verify connections
-    assert websocket_manager.get_client_count() == 2
-    assert websocket_manager.is_connected(client_id1)
-    assert websocket_manager.is_connected(client_id2)
-
-    # Add to groups
-    websocket_manager.add_to_group(client_id1, "group1")
-    websocket_manager.add_to_group(client_id2, "group1")
-    websocket_manager.add_to_group(client_id2, "group2")
-
-    # Verify groups
-    assert websocket_manager.get_group_count("group1") == 2
-    assert websocket_manager.get_group_count("group2") == 1
-    assert websocket_manager.get_active_groups() == ["group1", "group2"]
-
-    # Send personal message
-    message = WebSocketMessage(type="message", data={"text": "Hello"})
-    await websocket_manager.send_personal_message(message, client_id1)
-
-    # Verify message sent
-    assert len(ws1.sent_messages) == 1
-    assert json.loads(ws1.sent_messages[0])["type"] == "message"
-    assert json.loads(ws1.sent_messages[0])["data"]["text"] == "Hello"
-
-    # Broadcast to group
-    group_message = WebSocketMessage(type="notification", data={"text": "Group notification"})
-    await websocket_manager.broadcast_to_group(group_message, "group1")
-
-    # Verify group broadcast
-    assert len(ws1.sent_messages) == 2
-    assert len(ws2.sent_messages) == 1
-    assert json.loads(ws1.sent_messages[1])["type"] == "notification"
-    assert json.loads(ws2.sent_messages[0])["type"] == "notification"
-
-    # Broadcast to all
-    broadcast_message = WebSocketMessage(type="notification", data={"text": "Broadcast"})
-    await websocket_manager.broadcast(broadcast_message)
-
-    # Verify broadcast
-    assert len(ws1.sent_messages) == 3
-    assert len(ws2.sent_messages) == 2
-
-    # Disconnect client
-    websocket_manager.disconnect(client_id1)
-
-    # Verify disconnection
-    assert websocket_manager.get_client_count() == 1
-    assert not websocket_manager.is_connected(client_id1)
-    assert websocket_manager.get_group_count("group1") == 1
+def test_websocket_message_invalid_type():
+    with pytest.raises(ValueError):
+        WebSocketMessage(type="invalid", data={})
 
 
-async def test_websocket_api(client: AsyncClient, db_session: AsyncSession) -> None:
-    """Test WebSocket endpoints.
+@pytest.mark.asyncio
+async def test_connection_lifecycle():
+    manager = ConnectionManager()
+    mock_ws = AsyncMock()
+    client_id = await manager.connect(mock_ws)
+    assert manager.is_connected(client_id)
+    assert manager.get_client_count() == 1
 
-    Note: This is a high-level HTTP test for the broadcast endpoint.
-    Testing actual WebSocket connections requires a more complex
-    test setup with WebSocket client protocol.
-    """
-    # Test stats endpoint - should require authentication
-    response = await client.get("/api/v1/ws/stats")
-    assert response.status_code == 401
+    manager.disconnect(client_id)
+    assert not manager.is_connected(client_id)
+    assert manager.get_client_count() == 0
+
+
+def test_add_and_remove_from_group():
+    manager = ConnectionManager()
+    cid = uuid4()
+    manager.active_connections[cid] = AsyncMock()
+
+    manager.add_to_group(cid, "room1")
+    assert manager.get_group_count("room1") == 1
+
+    manager.remove_from_group(cid, "room1")
+    assert manager.get_group_count("room1") == 0
+
+
+@pytest.mark.asyncio
+async def test_send_personal_message_success():
+    manager = ConnectionManager()
+    mock_ws = AsyncMock()
+    client_id = await manager.connect(mock_ws)
+
+    message = WebSocketMessage(type="message", data={"text": "hi"})
+    sent = await manager.send_personal_message(message, client_id)
+    assert sent
+    mock_ws.send_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_send_personal_message_failure():
+    manager = ConnectionManager()
+    message = WebSocketMessage(type="message", data={})
+    sent = await manager.send_personal_message(message, uuid4())
+    assert not sent
+
+
+@pytest.mark.asyncio
+async def test_broadcast_handles_disconnect():
+    manager = ConnectionManager()
+    cid1, cid2 = uuid4(), uuid4()
+
+    # First succeeds, second raises error
+    ws1 = AsyncMock()
+    ws2 = AsyncMock()
+    ws2.send_text.side_effect = Exception("fail")
+
+    manager.active_connections[cid1] = ws1
+    manager.active_connections[cid2] = ws2
+
+    message = WebSocketMessage(type="message", data={"text": "hello"})
+    await manager.broadcast(message)
+
+    assert manager.is_connected(cid1)
+    assert not manager.is_connected(cid2)  # disconnected due to error
+
+
+@pytest.mark.asyncio
+async def test_broadcast_to_group():
+    manager = ConnectionManager()
+    cid = uuid4()
+    ws = AsyncMock()
+
+    manager.active_connections[cid] = ws
+    manager.add_to_group(cid, "roomX")
+
+    msg = WebSocketMessage(type="message", data={"x": 1})
+    await manager.broadcast_to_group(msg, "roomX")
+    ws.send_text.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_receive_text_valid_json():
+    manager = ConnectionManager()
+    ws = AsyncMock()
+    ws.receive_text.return_value = json.dumps({"type": "message", "data": {"ok": 1}})
+    cid = await manager.connect(ws)
+
+    result = await manager.receive_text(cid)
+    assert result["type"] == "message"
+
+
+@pytest.mark.asyncio
+async def test_receive_text_invalid_json():
+    manager = ConnectionManager()
+    ws = AsyncMock()
+    ws.receive_text.return_value = "not_json"
+    cid = await manager.connect(ws)
+
+    result = await manager.receive_text(cid)
+    assert result["type"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_receive_text_disconnect():
+    manager = ConnectionManager()
+    ws = AsyncMock()
+    ws.receive_text.side_effect = WebSocketDisconnect()
+    cid = await manager.connect(ws)
+
+    with pytest.raises(WebSocketDisconnect):
+        await manager.receive_text(cid)
+
+
+def test_group_utilities():
+    manager = ConnectionManager()
+    cid = uuid4()
+    manager.active_connections[cid] = AsyncMock()
+    manager.add_to_group(cid, "roomA")
+
+    assert manager.get_group_count("roomA") == 1
+    assert "roomA" in manager.get_active_groups()
+    assert manager.is_connected(cid)

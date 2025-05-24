@@ -1,0 +1,54 @@
+name: DB Migrations on VPS
+
+on:
+  workflow_call:
+
+jobs:
+  db-migrate:
+    name: Run Migration on VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH Key
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 --decode > key.pem
+          chmod 600 key.pem
+
+      - name: Run Migration via SSH on VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST << 'EOF'
+            echo "📥 Pulling latest code..."
+            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            git pull origin main
+
+            echo "🐳 Restarting containers..."
+            docker-compose down
+            docker-compose up -d smartpay-postgres-prod
+            sleep 5
+            docker-compose up -d smartpay-api-prod
+
+            echo "📦 Running migrations..."
+            docker-compose exec smartpay-api-prod sh -c "python manage.py migrate_all"
+          EOF
+
+      - name: Notify Telegram - Migration Success
+        if: success()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="✅ *SmartPay Migration Succeeded*\n📦 Tag: \`${{ github.ref_name }}\`\n🔗 [Run Link]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d parse_mode=Markdown
+
+      - name: Notify Telegram - Migration Failed
+        if: failure()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ *SmartPay Migration Failed*\n📦 Tag: \`${{ github.ref_name }}\`\n🔗 [Run Link]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d parse_mode=Markdown
