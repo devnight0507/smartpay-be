@@ -35,18 +35,18 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 
-async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     """Get user by email."""
     query = select(User).where(User.email == email)
     result = await db.execute(query)
-    return result.scalars().first()
+    return result.scalars().first()  # type: ignore[no-any-return]
 
 
-async def get_user_by_phone(db: AsyncSession, phone: str) -> Optional[User]:
+async def get_user_by_phone(db: AsyncSession, phone: str) -> User | None:
     """Get user by phone."""
     query = select(User).where(User.phone == phone)
     result = await db.execute(query)
-    return result.scalars().first()
+    return result.scalars().first()  # type: ignore[no-any-return]
 
 
 async def authenticate_user(db: AsyncSession, username: str, password: str) -> Optional[User]:
@@ -91,7 +91,7 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
-    return user
+    return user  # type: ignore[no-any-return]
 
 
 async def get_current_active_user(

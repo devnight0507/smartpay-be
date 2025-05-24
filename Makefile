@@ -1,4 +1,4 @@
-.PHONY: help setup dev-setup dev-up dev-down dev-restart lint format test migrations migrate migrate-down shell logs clean
+.PHONY: help setup dev-setup dev-up dev-down dev-restart lint format test coverage migrations migrate migrate-down shell logs clean
 
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
@@ -17,6 +17,7 @@ help:
 	@echo "  make lint              Run linters (black, isort, flake8, mypy)"
 	@echo "  make format            Format code with black and isort"
 	@echo "  make test              Run tests in Docker"
+	@echo "  make coverage          Run tests with coverage report (min 80%)"
 	@echo "  make migrations        Create migration with alembic"
 	@echo "  make migrate           Apply all migrations"
 	@echo "  make migrate-down      Rollback last migration"
@@ -53,6 +54,9 @@ format:
 
 test:
 	$(DOCKER_COMPOSE) exec $(SERVICE) pytest -xvs $(T)
+
+coverage:
+	$(DOCKER_COMPOSE) exec $(SERVICE) pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
 migrations:
 	$(DOCKER_COMPOSE) exec $(SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"

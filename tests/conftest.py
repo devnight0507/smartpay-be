@@ -7,6 +7,7 @@ import os
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock
 
+import asyncpg
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -18,8 +19,10 @@ from app.db.session import Base
 from app.main import app
 
 # Test database URL
+TEST_DATABASE_NAME = "smartpay_test"
+
 TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/smartpay_test"
+    "TEST_DATABASE_URL", f"postgresql+asyncpg://postgres:postgres@smartpay-postgres:5432/{TEST_DATABASE_NAME}"
 )
 
 # Disable tracing for tests
@@ -38,6 +41,31 @@ test_async_session = sessionmaker(
     expire_on_commit=False,
     autoflush=False,
 )
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def prepare_test_db() -> AsyncGenerator[None, None]:
+    """
+    Create the test database before tests run, and drop it after tests.
+    """
+    admin_dsn = os.getenv("TEST_ADMIN_DSN", "postgresql://postgres:postgres@smartpay-postgres:5432/postgres")
+
+    conn = await asyncpg.connect(dsn=admin_dsn)
+    try:
+        await conn.execute(f'DROP DATABASE IF EXISTS "{TEST_DATABASE_NAME}" WITH (FORCE);')
+        await conn.execute(f'CREATE DATABASE "{TEST_DATABASE_NAME}";')
+        print(f"✅ Created test database: {TEST_DATABASE_NAME}")
+    finally:
+        await conn.close()
+
+    yield
+
+    conn = await asyncpg.connect(dsn=admin_dsn)
+    try:
+        await conn.execute(f'DROP DATABASE IF EXISTS "{TEST_DATABASE_NAME}" WITH (FORCE);')
+        print(f"🧹 Dropped test database: {TEST_DATABASE_NAME}")
+    finally:
+        await conn.close()
 
 
 @pytest.fixture(scope="session")
@@ -75,10 +103,7 @@ async def mock_redis() -> AsyncGenerator[AsyncMock, None]:
     """
     Create a mock Redis client for testing.
     """
-    # Create a mock Redis client
     mock_client = AsyncMock()
-
-    # Mock common Redis methods
     mock_client.ping.return_value = True
     mock_client.get.return_value = "mock_value"
     mock_client.set.return_value = True
@@ -86,7 +111,6 @@ async def mock_redis() -> AsyncGenerator[AsyncMock, None]:
     mock_client.exists.return_value = 1
     mock_client.incr.return_value = 1
     mock_client.decr.return_value = 0
-
     yield mock_client
 
 
@@ -95,14 +119,10 @@ async def mock_kafka() -> AsyncGenerator[AsyncMock, None]:
     """
     Create a mock Kafka producer for testing.
     """
-    # Create a mock Kafka producer
     mock_producer = AsyncMock()
-
-    # Mock Kafka producer methods
     mock_producer.connected.return_value = True
     mock_producer.start.return_value = None
     mock_producer.send_message.return_value = {"status": "sent", "topic": "test_topic"}
-
     yield mock_producer
 
 
@@ -112,23 +132,17 @@ async def client(
 ) -> AsyncGenerator[AsyncClient, None]:
     """
     Create a test client for the FastAPI application.
-
-    Yields an async client that can be used to make requests to the app.
     """
 
-    # Override the database dependency
     async def override_get_db():
         try:
             yield db_session
         finally:
             pass
 
-    # Apply all dependency overrides
     app.dependency_overrides[get_db_session] = override_get_db
 
-    # Create a test client for the FastAPI app
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
 
-    # Reset overrides
     app.dependency_overrides = {}
