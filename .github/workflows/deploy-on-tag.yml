@@ -11,7 +11,7 @@ on:
 
 jobs:
   db-migrations:
-      uses: ./.github/workflows/db-migration.yaml
+      uses: ./.github/workflows/db-migration.yml
       secrets: inherit
   deploy:
     runs-on: ubuntu-latest

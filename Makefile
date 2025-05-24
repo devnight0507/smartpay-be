@@ -2,8 +2,8 @@
 
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
-DEV_COMPOSE := docker-compose -f docker-compose.dev.yaml --env-file .env.dev
-PROD_COMPOSE := docker-compose -f docker-compose.prod.ayml --env-file .env.prod
+DEV_COMPOSE := docker-compose -f docker-compose.dev.yml --env-file .env.dev
+PROD_COMPOSE := docker-compose -f docker-compose.prod.yml --env-file .env.prod
 DEV_SERVICE := smartpay-api-dev
 PROD_SERVICE := smartpay-api-prod
 ALEMBIC := alembic
