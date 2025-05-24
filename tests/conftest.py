@@ -48,7 +48,7 @@ async def prepare_test_db() -> AsyncGenerator[None, None]:
     """
     Create the test database before tests run, and drop it after tests.
     """
-    admin_dsn = "postgresql://postgres:postgres@smartpay-postgres:5432/postgres"
+    admin_dsn = os.getenv("TEST_ADMIN_DSN", "postgresql://postgres:postgres@smartpay-postgres:5432/postgres")
 
     conn = await asyncpg.connect(dsn=admin_dsn)
     try:
