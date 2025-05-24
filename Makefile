@@ -56,7 +56,7 @@ test:
 	$(DOCKER_COMPOSE) exec $(SERVICE) pytest -xvs $(T)
 
 coverage:
-	$(DOCKER_COMPOSE) exec $(SERVICE) pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=60
+	$(DOCKER_COMPOSE) exec $(SERVICE) pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
 migrations:
 	$(DOCKER_COMPOSE) exec $(SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"
