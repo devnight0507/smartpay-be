@@ -75,6 +75,9 @@ jobs:
           poetry config virtualenvs.create false
           poetry install --no-interaction --no-root --with dev
 
+      - name: Copy .env file for testing
+        run: cp .env.example .env
+
       - name: Wait for PostgreSQL and Create Test Database
         run: |
           until pg_isready -h localhost -U postgres; do echo "Waiting for postgres..."; sleep 2; done
