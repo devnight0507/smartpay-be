@@ -1,11 +1,18 @@
-name: Deploy to VPS on Tag
+name: Deploy 🚀 to VPS on Tag
 
 on:
+  release:
+    types: [created]
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'environment/stage/values.yaml'
 
 jobs:
+  db-migrations:
+      uses: ./.github/workflows/db-migration.yml
+      secrets: inherit
   deploy:
     runs-on: ubuntu-latest
 
@@ -27,7 +34,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Image
+      - name: Build & Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -50,3 +57,19 @@ jobs:
       - name: Run Deployment Script on VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd ${{ secrets.VPS_DEPLOY_PATH }} && ./deploy.sh"
+
+      - name: Notify Telegram – Success
+        if: success()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="✅ *SmartPay Deployed Successfully*\n📦 Version: \`${{ env.VERSION }}\`\n🔗 [View Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d parse_mode=Markdown
+
+      - name: Notify Telegram – Failure
+        if: failure()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ *SmartPay Deployment Failed*\n📦 Version: \`${{ env.VERSION }}\`\n🔗 [View Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d parse_mode=Markdown

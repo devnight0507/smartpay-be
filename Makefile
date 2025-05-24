@@ -1,27 +1,32 @@
-.PHONY: help setup dev-setup dev-up dev-down dev-restart lint format test coverage migrations migrate migrate-down shell logs clean
+.PHONY: help setup dev-setup dev-up dev-down dev-restart prod-up prod-down prod-restart lint format test coverage migrations migrate migrate-down shell logs clean
 
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
-SERVICE := smartpay-api
+DEV_COMPOSE := docker-compose -f docker-compose.dev.yml --env-file .env.dev
+PROD_COMPOSE := docker-compose -f docker-compose.prod.yml --env-file .env.prod
+DEV_SERVICE := smartpay-api-dev
+PROD_SERVICE := smartpay-api-prod
 ALEMBIC := alembic
 
 help:
 	@echo "FastAPI Microservice Template Makefile"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make setup             Install Python dependencies"
 	@echo "  make dev-setup         Setup development environment"
 	@echo "  make dev-up            Start development containers"
 	@echo "  make dev-down          Stop development containers"
 	@echo "  make dev-restart       Restart development containers"
+	@echo "  make prod-up           Start production containers"
+	@echo "  make prod-down         Stop production containers"
+	@echo "  make prod-restart      Restart production containers"
 	@echo "  make lint              Run linters (black, isort, flake8, mypy)"
 	@echo "  make format            Format code with black and isort"
 	@echo "  make test              Run tests in Docker"
 	@echo "  make coverage          Run tests with coverage report (min 80%)"
-	@echo "  make migrations        Create migration with alembic"
-	@echo "  make migrate           Apply all migrations"
-	@echo "  make migrate-down      Rollback last migration"
-	@echo "  make shell             Start a shell in the API container"
+	@echo "  make migrations        Create migration with alembic (dev)"
+	@echo "  make migrate           Apply all migrations (dev)"
+	@echo "  make migrate-down      Rollback last migration (dev)"
+	@echo "  make shell             Start a shell in the API container (dev)"
 	@echo "  make logs              Show logs from containers"
 	@echo "  make clean             Remove cache files and directories"
 
@@ -31,16 +36,25 @@ setup:
 
 dev-setup:
 	mkdir -p ./docker/postgres
-	cp .env.example .env
+	cp .env.dev .env
 
 dev-up:
-	$(DOCKER_COMPOSE) up -d
+	$(DEV_COMPOSE) up -d
 
 dev-down:
-	$(DOCKER_COMPOSE) down
+	$(DEV_COMPOSE) down
 
 dev-restart:
-	$(DOCKER_COMPOSE) restart
+	$(DEV_COMPOSE) restart
+
+prod-up:
+	$(PROD_COMPOSE) up -d
+
+prod-down:
+	$(PROD_COMPOSE) down
+
+prod-restart:
+	$(PROD_COMPOSE) restart
 
 lint:
 	poetry run black --check .
@@ -53,25 +67,25 @@ format:
 	poetry run isort .
 
 test:
-	$(DOCKER_COMPOSE) exec $(SERVICE) pytest -xvs $(T)
+	$(DEV_COMPOSE) exec $(DEV_SERVICE) pytest -xvs $(T)
 
 coverage:
-	$(DOCKER_COMPOSE) exec $(SERVICE) pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+	$(DEV_COMPOSE) exec $(DEV_SERVICE) pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
 
 migrations:
-	$(DOCKER_COMPOSE) exec $(SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"
+	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"
 
 migrate:
-	$(DOCKER_COMPOSE) exec $(SERVICE) $(ALEMBIC) upgrade head
+	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) upgrade head
 
 migrate-down:
-	$(DOCKER_COMPOSE) exec $(SERVICE) $(ALEMBIC) downgrade -1
+	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) downgrade -1
 
 shell:
-	$(DOCKER_COMPOSE) exec $(SERVICE) /bin/bash
+	$(DEV_COMPOSE) exec $(DEV_SERVICE) /bin/bash
 
 logs:
-	$(DOCKER_COMPOSE) logs -f $(S)
+	$(DEV_COMPOSE) logs -f $(DEV_SERVICE)
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

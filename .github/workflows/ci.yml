@@ -2,11 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
-    tags:
-      - "v*"
-  pull_request:
-    branches: [main, develop]
+    branches:
+      - "**"
+      - "!main"
 
 jobs:
   lint:
@@ -49,7 +47,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -77,6 +75,7 @@ jobs:
           pip install poetry
           poetry config virtualenvs.create false
           poetry install --no-interaction --no-root --with dev
+          pip install coverage
 
       - name: Copy .env file for testing
         run: cp .env.example .env
@@ -91,3 +90,27 @@ jobs:
       - name: Run tests and enforce 60% coverage
         run: |
           poetry run pytest --cov=app --cov-report=xml --cov-fail-under=60
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          file: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          override_branch: main
+
+      - name: Notify Telegram – Success
+        if: success()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="✅ *SmartPay CI passed*\nBranch: \`${{ github.ref_name }}\`\n🔗 [View Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d parse_mode=Markdown
+
+      - name: Notify Telegram – Failure
+        if: failure()
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ *SmartPay CI failed*\nBranch: \`${{ github.ref_name }}\`\n🔗 [View Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            -d parse_mode=Markdown

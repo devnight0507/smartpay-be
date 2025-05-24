@@ -315,22 +315,6 @@ Run the container:
 docker run -p 8000:8000 --env-file .env smartpay-be:latest
 ```
 
-## Kubernetes Deployment
-
-Apply the Kubernetes manifests:
-
-```bash
-# Update configmap values for your environment
-kubectl apply -f k8s/configmap.yaml
-
-# Apply secrets
-kubectl apply -f k8s/secrets.yaml
-
-# Deploy the service
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-```
-
 ## CI/CD
 
 The template includes a GitHub Actions workflow for CI/CD:
