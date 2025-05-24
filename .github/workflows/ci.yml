@@ -44,6 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     env:
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/smartpay_test
       TEST_ADMIN_DSN: postgresql://postgres:postgres@localhost:5432/postgres
 
     services:
