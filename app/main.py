@@ -24,6 +24,7 @@ from app.api.routes.v1.endpoints.websockets.notifications import (
 )
 from app.api.routes.v1.notification import router as notification_router
 from app.api.routes.v1.paymentCard import router as paymentCard_router
+from app.api.routes.v1.profile import router as profile_router
 from app.api.routes.v1.setting import router as notification_setting_router
 from app.api.routes.v1.wallet import router as wallet_router
 from app.core.config import settings
@@ -79,6 +80,7 @@ def create_application() -> FastAPI:
         openapi_tags=[
             {"name": "Health", "description": "Health check and readiness endpoints"},
             {"name": "Auth", "description": "Authentication endpoints"},
+            {"name": "Profile", "description": "Profile endpoints"},
             {"name": "Admin", "description": "Admin management endpoints"},
             {"name": "Wallet", "description": "Wallet check endpoints"},
             {"name": "Payment Card", "description": "Payment card endpoints"},
@@ -116,6 +118,7 @@ def create_application() -> FastAPI:
     # Include routers
     application.include_router(health_router, prefix="/api/health", tags=["Health"])
     application.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
+    application.include_router(profile_router, prefix="/api/v1/profile", tags=["Profile"])
     application.include_router(wallet_router, prefix="/api/v1/wallet", tags=["Wallet"])
     application.include_router(notification_router, prefix="/api/v1/notification", tags=["notification"])
     application.include_router(notification_setting_router, prefix="/api/v1/notification_setting", tags=["Wallet"])
