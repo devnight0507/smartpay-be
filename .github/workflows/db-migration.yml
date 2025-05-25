@@ -14,17 +14,18 @@ jobs:
 
       - name: Setup SSH Key
         run: |
-          echo "${{ secrets.VPS_SSH_KEY }}" > key.pem
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 --decode > key.pem
           chmod 600 key.pem
 
       - name: Run Migration via SSH on VPS
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -i key.pem -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST <<EOF
             echo "📥 Pulling latest code..."
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            cd $VPS_DEPLOY_PATH
             git pull origin main
 
             echo "🐳 Restarting containers..."
