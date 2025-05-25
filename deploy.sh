@@ -47,7 +47,7 @@ sleep 5
 
 echo "📦 Running database migrations..."
 docker-compose -f docker-compose.prod.yml --env-file .env.prod exec smartpay-api-prod \
-  python manage.py migrate_all
+  docker-compose -f docker-compose.prod.yml --env-file .env.prod exec smartpay-api-prod alembic upgrade head
 
 echo "⚙️ Starting all services..."
 docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
