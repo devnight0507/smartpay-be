@@ -29,13 +29,12 @@ jobs:
             git pull origin main
 
             echo "🐳 Restarting containers..."
-            docker-compose down
-            docker-compose up -d smartpay-postgres-prod
+            make prod-down
+            make prod-up
             sleep 5
-            docker-compose up -d smartpay-api-prod
 
             echo "📦 Running migrations..."
-            docker-compose exec smartpay-api-prod sh -c "python manage.py migrate_all"
+            make prod-migrate
           EOF
 
       - name: Notify Telegram - Migration Success
