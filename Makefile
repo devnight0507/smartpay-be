@@ -3,7 +3,7 @@
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
 DEV_COMPOSE := docker-compose -f docker-compose.dev.yml --env-file .env.dev
-PROD_COMPOSE := docker-compose -f docker-compose.prod.yml --env-file .env.prod
+PROD_COMPOSE := docker-compose -f docker-compose.prod.yml --env-file .env
 DEV_SERVICE := smartpay-api-dev
 PROD_SERVICE := smartpay-api-prod
 ALEMBIC := alembic
@@ -80,6 +80,15 @@ migrate:
 
 migrate-down:
 	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) downgrade -1
+
+prod-migrations:
+	$(PROD_COMPOSE) exec $(PROD_SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"
+
+prod-migrate:
+	$(PROD_COMPOSE) exec $(PROD_SERVICE) $(ALEMBIC) upgrade head
+
+prod-migrate-down:
+	$(PROD_COMPOSE) exec $(PROD_SERVICE) $(ALEMBIC) downgrade -1
 
 shell:
 	$(DEV_COMPOSE) exec $(DEV_SERVICE) /bin/bash
