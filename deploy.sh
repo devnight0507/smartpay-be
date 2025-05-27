@@ -26,7 +26,7 @@ function notify_telegram() {
 echo "🚀 Starting SmartPay deployment..."
 
 if [ -f ".env.prod" ]; then
-  echo "📦 Loading environment from .env"
+  echo "📦 Loading environment from .env.prod"
   export $(grep -v '^#' .env.prod | xargs)
 fi
 
@@ -35,19 +35,18 @@ trap 'notify_telegram "failure" "Deployment failed at step: $BASH_COMMAND"' ERR
 echo "📥 Pulling latest code..."
 git pull origin main
 
-echo "🐳 Stopping running containers..."
+echo "🛑 Stopping running containers..."
 docker-compose -f docker-compose.yml --env-file .env down
 
 echo "🔧 Building fresh images..."
 docker-compose -f docker-compose.yml --env-file .env build
 
-echo "⬆️ Starting required services (DB only)..."
+echo "🗄️ Starting DB only..."
 docker-compose -f docker-compose.yml --env-file .env up -d smartpay-postgres
 sleep 5
 
-echo "📦 Running database migrations..."
-docker-compose -f docker-compose.yml --env-file .env exec smartpay-api \
-  docker-compose -f docker-compose.yml --env-file .env exec smartpay-api alembic upgrade head
+echo "🧮 Running database migrations..."
+docker-compose -f docker-compose.yml --env-file .env run smartpay-api alembic upgrade head
 
 echo "⚙️ Starting all services..."
 docker-compose -f docker-compose.yml --env-file .env up -d
