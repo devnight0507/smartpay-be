@@ -13,15 +13,9 @@ from sqlalchemy.future import select
 from app.api.dependencies import authenticate_user, get_current_active_user
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
-from app.db.models.models import (
-    Notification,
-    User,
-    UserNotificationSetting,
-    VerificationCode,
-    Wallet,
-)
+from app.db.models.models import User, VerificationCode, Wallet
 from app.db.session import get_db
-from app.schemas.schemas import Token
+from app.schemas.schemas import NotifSettingUpdate, Token
 from app.schemas.schemas import User as UserSchema
 from app.schemas.schemas import UserCreate, VerificationRequest, VerificationResponse
 
@@ -96,17 +90,6 @@ async def register(
     db.add(db_wallet)
     await db.commit()
 
-    # Create default notification setting and welcome notification
-    notification_setting = UserNotificationSetting(user_id=db_user.id)
-    welcome = Notification(
-        user_id=db_user.id,
-        title="Welcome to SmartPay",
-        message="Thanks for joining! Set your preferences in the notification tab.",
-        type="system_messages",
-    )
-    db.add_all([notification_setting, welcome])
-    await db.commit()
-
     # Create verification code based on what's available
     verification = None
     if email:
@@ -178,6 +161,64 @@ async def get_me(
         "created_at": current_user.created_at,
         "updated_at": current_user.updated_at,
     }
+
+
+@router.get(
+    "/notif-setting",
+    summary="Get notif",
+)
+async def get_notif_setting(
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """Get current authenticated user information."""
+    logger.info(f"Getting user info for user ID: {current_user.id}")
+
+    return {
+        "notif_setting": current_user.notif_setting,
+    }
+
+
+@router.put(
+    "/notif-setting",
+    summary="Update notification setting",
+)
+async def update_notif_setting(
+    setting_data: NotifSettingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    current_user.notif_setting = setting_data.notif_setting  # type: ignore
+    await db.commit()
+    await db.refresh(current_user)
+    return {
+        "message": "Notification setting updated successfully",
+        "notif_setting": current_user.notif_setting,
+    }
+
+
+# async def update_notif_setting(
+#     setting_data: NotifSettingUpdate,
+#     db: AsyncSession = Depends(get_db),
+#     current_user: User = Depends(get_current_active_user),
+# ) -> Any:
+#     """Update current authenticated user notification setting."""
+#     logger.info(f"Updating notification setting for user ID: {current_user.id}")
+
+#     # # Validate setting value
+#     # valid_settings = ["system", "both", "phone", "email", "none"]
+#     # if setting_data.notif_setting not in valid_settings:
+#     #     raise HTTPException(status_code=400, detail=f"Invalid setting. Must be one of: {valid_settings}")
+#     # Update user's notification setting
+#     str(current_user.notif_setting) == setting_data.notif_setting
+#     await db.commit()
+#     await db.refresh(current_user)
+
+#     logger.info(f"Updated notification setting to: {setting_data.notif_setting}")
+
+#     return {
+#         "message": "Notification setting updated successfully",
+#         "notif_setting": current_user.notif_setting,
+#     }
 
 
 @router.post("/verify/{verification_type}", response_model=VerificationResponse)

@@ -16,6 +16,7 @@ class User(Base):
     fullname = Column(String, nullable=True)
     email = Column(String, unique=True, index=True, nullable=True)
     phone = Column(String, unique=True, index=True, nullable=True)
+    notif_setting = Column(String, nullable=True, default="system")
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
@@ -106,35 +107,3 @@ class PaymentCard(Base):
 
     # Relationship
     user = relationship("User", back_populates="payment_cards")
-
-
-class Notification(Base):
-    """User notification model."""
-
-    __tablename__ = "notifications"
-
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-
-    title = Column(String(100), nullable=False)
-    message = Column(String, nullable=False)
-    type = Column(String(50), nullable=False)  # e.g., payment_received_email, system_notification
-    is_read = Column(Boolean, default=False, nullable=False)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationship
-    user = relationship("User", backref="notifications")
-
-
-class UserNotificationSetting(Base):
-    __tablename__ = "user_notification_settings"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
-
-    transaction_received_email = Column(Boolean, default=True)
-    transaction_received_phone = Column(Boolean, default=True)
-    system_messages = Column(Boolean, default=True)
-
-    user = relationship("User", backref="notification_settings")

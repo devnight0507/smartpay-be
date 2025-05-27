@@ -86,6 +86,28 @@ class TokenPayload(BaseModel):
     sub: Optional[str] = None
 
 
+class NotifSettingUpdate(BaseModel):
+    notif_setting: str = Field(
+        ...,
+        description="Notification setting preference",
+    )
+
+
+class NotifSettingResponse(BaseModel):
+    notif_setting: str = Field(description="Current notification setting")
+
+    class Config:
+        from_attributes = True
+
+
+class NotifiSettingUpdateResponse(BaseModel):
+    message: str = Field(description="Success message")
+    notif_setting: str = Field(description="Updated notification setting")
+
+    class Config:
+        from_attributes = True
+
+
 # Wallet schemas
 class WalletBase(BaseModel):
     """Base wallet schema."""
@@ -372,42 +394,13 @@ class MessageResponse(BaseModel):
     message: str
 
 
-class NotificationBase(BaseModel):
-    """Base notification schema."""
+class UserActiveResponseUpdate(BaseModel):
+    """Response schema for update operations."""
 
-    title: str
+    success: bool
+
+
+class UserActiveRequest(BaseModel):
+    """Response schema for update operations."""
+
     message: str
-    type: str  # e.g. "payment_received_email", "payment_received_phone", "system_notification"
-    is_read: bool = False
-
-
-class NotificationCreate(NotificationBase):
-    """Schema for notification creation."""
-
-    user_id: UUID
-
-
-class NotificationInDBBase(NotificationBase):
-    """Base schema for notification in DB."""
-
-    id: UUID
-    user_id: UUID
-    created_at: datetime
-
-    class Config:
-        orm_mode = True
-
-
-class NotificationSettings(BaseModel):
-    transaction_received_email: bool = True
-    transaction_received_phone: bool = True
-    system_messages: bool = True
-
-    class Config:
-        orm_mode = True
-
-
-class NotificationSettingsUpdate(BaseModel):
-    transaction_received_email: bool = True
-    transaction_received_phone: Optional[bool]
-    system_messages: Optional[bool]
