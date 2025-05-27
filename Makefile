@@ -65,7 +65,7 @@ migrations:
 	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"
 
 migrate:
-	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) upgrade head
+	$(DEV_COMPOSE) run $(DEV_SERVICE) $(ALEMBIC) upgrade head
 
 migrate-down:
 	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) downgrade -1
