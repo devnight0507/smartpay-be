@@ -50,21 +50,11 @@ jobs:
             ${{ env.IMAGE }}:${{ env.VERSION }}
             ${{ env.IMAGE }}:latest
 
-      - name: Setup SSH Key
+      - name: Run Deployment Script on VPS
         run: |
           echo "${{ secrets.VPS_SSH_KEY }}" | base64 --decode > key.pem
           chmod 600 key.pem
-          eval "$(ssh-agent -s)"
-          ssh-add key.pem
-
-      - name: Add VPS to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Run Deployment Script on VPS
-        run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd ${{ secrets.VPS_DEPLOY_PATH }} && ./deploy.sh"
+          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd ${{ secrets.VPS_DEPLOY_PATH }} && ./deploy.sh"
 
       - name: Notify Telegram – Success
         if: success()
