@@ -11,9 +11,14 @@ on:
 
 jobs:
   db-migrations:
-      uses: ./.github/workflows/db-migration.yml
-      secrets: inherit
+    uses: ./.github/workflows/db-migration.yml
+    secrets: inherit
+  build:
+    needs: db-migrations
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
   deploy:
+    needs: build
     runs-on: ubuntu-latest
 
     env:
@@ -38,7 +43,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.prod
+          file: docker/Dockerfile.dev
           push: true
           tags: |
             ${{ env.IMAGE }}:${{ env.VERSION }}

@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.prod
+          file: docker/Dockerfile.dev
           push: true
           tags: |
             ${{ env.IMAGE }}:${{ env.VERSION }}
