@@ -3,8 +3,7 @@
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
 DEV_COMPOSE := docker-compose -f docker-compose.yml --env-file .env
-ENV_POSTFIX ?= dev
-DEV_SERVICE := smartpay-api-$(ENV_POSTFIX)
+DEV_SERVICE := smartpay-api
 ALEMBIC := alembic
 
 help:

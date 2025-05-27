@@ -6,12 +6,12 @@ image:
   tag: latest  # Will be overwritten dynamically in CI/CD
 
 app:
-  container_name: smartpay-api-prod
+  container_name: smartpay-api
   build_context: .
   dockerfile: docker/Dockerfile.dev
   host_port: 9000
   container_port: 8000
-  env_file: .env.prod
+  env_file: .env
   command: >
     uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
   healthcheck:
@@ -21,15 +21,15 @@ app:
     retries: 3
     start_period: 10s
   depends_on:
-    - smartpay-postgres-prod
+    - smartpay-postgres
 
 postgres:
-  container_name: smartpay-postgres-prod
+  container_name: smartpay-postgres
   image: postgres:16
   host_port: 6432
   container_port: 5432
-  env_file: .env.prod
-  volume: smartpay_postgres_data_prod
+  env_file: .env
+  volume: smartpay_postgres_data
   init_script: ./docker/postgres/init-db.sh
   healthcheck:
     test: pg_isready -U postgres
@@ -38,17 +38,17 @@ postgres:
     retries: 5
 
 pgadmin:
-  container_name: smartpay-pgadmin-prod
+  container_name: smartpay-pgadmin
   image: dpage/pgadmin4:latest
   host_port: 5051
   container_port: 80
   admin_email: admin@example.com
   admin_password: admin
-  volume: smartpay_pgadmin_data_prod
+  volume: smartpay_pgadmin_data
   config_server_mode: false
   depends_on:
-    - smartpay-postgres-prod
+    - smartpay-postgres
 
 network:
-  name: smartpay-prod-network
+  name: smartpay-network
   driver: bridge

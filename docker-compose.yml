@@ -2,6 +2,8 @@ version: "3.8"
 
 services:
   smartpay-api:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: docker/Dockerfile.dev
@@ -17,8 +19,8 @@ services:
     networks:
       - smartpay-network
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      DEBUG: ${DEBUG:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-True}
       SECRET_KEY: ${SECRET_KEY:-prod_change_this_to_a_secure_random_string}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       JSON_LOGS: ${JSON_LOGS:-true}
@@ -26,9 +28,9 @@ services:
       POSTGRES_SERVER: ${POSTGRES_SERVER:-smartpay-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secureprodpass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-smartpay}
-      DATABASE_URI: ${DATABASE_URI:-postgresql+asyncpg://postgres:secureprodpass@smartpay-postgres:5432/smartpay}
+      DATABASE_URI: ${DATABASE_URI:-postgresql+asyncpg://postgres:postgres@smartpay-postgres:5432/smartpay}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -39,8 +41,10 @@ services:
   smartpay-postgres:
     image: postgres:16
     container_name: smartpay-postgres
+    env_file:
+      - .env
     volumes:
-      - smartpay_postgres_data:/var/lib/postgresql/data
+      - smartpay_postgres_data_${ENV_POSTFIX:-dev}:/var/lib/postgresql/data
       - ./docker/postgres/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     ports:
       - "${POSTGRES_PORT_EXTERNAL:-6432}:5432"
@@ -75,5 +79,6 @@ networks:
     driver: bridge
 
 volumes:
-  smartpay_postgres_data:
+  smartpay_postgres_data_dev:
+  smartpay_postgres_data_prod:
   smartpay_pgadmin_data:
