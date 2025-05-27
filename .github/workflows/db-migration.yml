@@ -34,7 +34,7 @@ jobs:
             sleep 5
 
             echo "📦 Running migrations..."
-            make dev-migrate
+            make migrate
           EOF
 
       - name: Notify Telegram - Migration Success
