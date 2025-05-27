@@ -2,10 +2,8 @@
 
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
-DEV_COMPOSE := docker-compose -f docker-compose.dev.yml --env-file .env.dev
-PROD_COMPOSE := docker-compose -f docker-compose.prod.yml --env-file .env.prod
-DEV_SERVICE := smartpay-api-dev
-PROD_SERVICE := smartpay-api-prod
+DEV_COMPOSE := docker-compose -f docker-compose.yml --env-file .env
+DEV_SERVICE := smartpay-api
 ALEMBIC := alembic
 
 help:
@@ -47,15 +45,6 @@ dev-down:
 dev-restart:
 	$(DEV_COMPOSE) restart
 
-prod-up:
-	$(PROD_COMPOSE) up -d
-
-prod-down:
-	$(PROD_COMPOSE) down
-
-prod-restart:
-	$(PROD_COMPOSE) restart
-
 lint:
 	poetry run black --check .
 	poetry run isort --check-only .
@@ -76,7 +65,7 @@ migrations:
 	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) revision --autogenerate -m "$(M)"
 
 migrate:
-	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) upgrade head
+	$(DEV_COMPOSE) run $(DEV_SERVICE) $(ALEMBIC) upgrade head
 
 migrate-down:
 	$(DEV_COMPOSE) exec $(DEV_SERVICE) $(ALEMBIC) downgrade -1

@@ -21,20 +21,20 @@ jobs:
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -i key.pem -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST <<EOF
             echo "📥 Pulling latest code..."
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            cd $VPS_DEPLOY_PATH
             git pull origin main
 
             echo "🐳 Restarting containers..."
-            docker-compose down
-            docker-compose up -d smartpay-postgres-prod
+            make dev-down
+            make dev-up
             sleep 5
-            docker-compose up -d smartpay-api-prod
 
             echo "📦 Running migrations..."
-            docker-compose exec smartpay-api-prod sh -c "python manage.py migrate_all"
+            make migrate
           EOF
 
       - name: Notify Telegram - Migration Success
