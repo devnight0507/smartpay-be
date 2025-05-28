@@ -395,12 +395,19 @@ class MessageResponse(BaseModel):
 
 
 class UserActiveResponseUpdate(BaseModel):
-    """Response schema for update operations."""
+    """
+    Schema for user activation/deactivation response
+    Used when admin toggles user active status
+    """
 
     success: bool
+    message: Optional[str] = None
+    is_active: Optional[bool] = None
+
+    class Config:
+        # For Pydantic v2 (use this)
+        json_schema_extra = {"example": {"success": True, "message": "User activated successfully", "is_active": True}}
 
 
-class UserActiveRequest(BaseModel):
-    """Response schema for update operations."""
-
-    message: str
+class AdminPasswordUpdateRequest(BaseModel):
+    new_password: str = Field(..., min_length=8)

@@ -18,6 +18,7 @@ from app.schemas.schemas import TopUpCreate
 from app.schemas.schemas import Transaction as TransactionSchema
 from app.schemas.schemas import TransactionCreate, TransactionWithUsers
 from app.schemas.schemas import Wallet as WalletSchema
+from app.utils.notifier import notify_user
 
 router = APIRouter()
 
@@ -151,6 +152,34 @@ async def transfer_money(
     db.add(transaction)
     await db.commit()
     await db.refresh(transaction)
+    print("DEBUG", transaction_id)
+
+    # Notify sender
+    await notify_user(
+        db=db,
+        user_id=str(current_user.id),
+        title="Transfer Successful",
+        message=(
+            f"You sent ${transaction_data.amount:.2f} to "
+            f"{recipient.fullname or recipient.email or recipient.phone}"
+        ),
+        type="transaction",
+        transaction_id=str(transaction.id),
+        amount=transaction_data.amount,
+    )
+
+    await notify_user(
+        db=db,
+        user_id=str(recipient.id),
+        title="You've Received Money",
+        message=(
+            f"You received ${transaction_data.amount:.2f} from "
+            f"{current_user.fullname or current_user.email or current_user.phone}"
+        ),
+        type="transaction",
+        transaction_id=str(transaction.id),
+        amount=transaction_data.amount,
+    )
 
     return transaction
 
