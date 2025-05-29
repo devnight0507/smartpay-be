@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, root_validator, validator
@@ -411,3 +411,164 @@ class UserActiveResponseUpdate(BaseModel):
 
 class AdminPasswordUpdateRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
+
+
+class MonthlyStat(BaseModel):
+    month: str
+    monthNumber: int
+    averageAmount: float
+    totalTransactions: int
+    totalVolume: float
+    trend: str  # "up", "down", "stable"
+    changePercentage: float
+
+    class Config:
+        from_attributes = True
+
+
+class OverallStats(BaseModel):
+    totalTransactions: int
+    totalVolume: float
+    overallAverage: float
+    monthOverMonthGrowth: float
+
+    class Config:
+        from_attributes = True
+
+
+class AdminTransactionSummary(BaseModel):
+    overallStats: OverallStats
+    monthlyStats: List[MonthlyStat]
+    lastUpdated: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MonthlyBalanceStat(BaseModel):
+    month: str
+    monthNumber: int
+    averageBalance: float
+    totalBalance: float
+    userCount: int
+    avgTrend: str
+    totalTrend: str
+    userTrend: str
+    avgChangePercentage: float
+    totalChangePercentage: float
+    userChangePercentage: float
+    newUsers: int
+
+    class Config:
+        from_attributes = True
+
+
+class OverallBalanceStats(BaseModel):
+    totalUsers: int
+    currentTotalBalance: float
+    currentAverageBalance: float
+    avgMonthOverMonthGrowth: float
+    totalMonthOverMonthGrowth: float
+    userMonthOverMonthGrowth: float
+    totalNewUsersThisYear: int
+
+    class Config:
+        from_attributes = True
+
+
+class BalanceSummaryResponse(BaseModel):
+    monthlyStats: List[MonthlyBalanceStat]
+    overallStats: OverallBalanceStats
+    lastUpdated: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserMonthlyStats(BaseModel):
+    name: str
+    received: float
+    sent: float
+    revenue: float
+
+
+# Add these schemas to your schemas.py file
+
+
+# =====================================
+# Forgot Password Schemas
+# =====================================
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Step 1: Request password reset via email."""
+
+    email: EmailStr
+
+    class Config:
+        json_schema_extra = {"example": {"email": "user@example.com"}}
+
+
+class ForgotPasswordVerifyCode(BaseModel):
+    """Step 2: Verify the reset code."""
+
+    email: EmailStr
+    verify_code: str = Field(..., min_length=6, max_length=6)
+
+    @validator("verify_code")
+    def validate_verify_code(cls, v: str) -> str:
+        """Validate verification code is exactly 6 digits."""
+        if not v.isdigit():
+            raise ValueError("Verification code must be numeric")
+        if len(v) != 6:
+            raise ValueError("Verification code must be exactly 6 digits")
+        return v
+
+    class Config:
+        json_schema_extra = {"example": {"email": "user@example.com", "verify_code": "123456"}}
+
+
+class ForgotPasswordReset(BaseModel):
+    """Step 3: Reset password with verified code."""
+
+    email: EmailStr
+    verify_code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")
+    confirm_password: str = Field(..., min_length=8, description="Confirm new password")
+
+    @validator("verify_code")
+    def validate_verify_code(cls, v: str) -> str:
+        """Validate verification code is exactly 6 digits."""
+        if not v.isdigit():
+            raise ValueError("Verification code must be numeric")
+        if len(v) != 6:
+            raise ValueError("Verification code must be exactly 6 digits")
+        return v
+
+    @validator("confirm_password")
+    def passwords_match(cls, v: str, values: dict) -> str:
+        """Validate that passwords match."""
+        if "new_password" in values and v != values["new_password"]:
+            raise ValueError("Passwords do not match")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "verify_code": "123456",
+                "new_password": "newPassword123",
+                "confirm_password": "newPassword123",
+            }
+        }
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Generic response for forgot password operations."""
+
+    success: bool
+    message: str
+    verified_code: str
+
+    class Config:
+        json_schema_extra = {"example": {"success": True, "message": "Password reset code sent to your email"}}

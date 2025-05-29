@@ -127,3 +127,15 @@ class Notification(Base):
 
     # Relationship
     user = relationship("User", back_populates="notifications")
+
+
+class RateLimitLog(Base):
+    """Rate limiting log for tracking API requests."""
+
+    __tablename__ = "rate_limit_logs"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    email = Column(String, nullable=False, index=True)
+    endpoint = Column(String, nullable=False)  # e.g., "forgot_password_send_code"
+    ip_address = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

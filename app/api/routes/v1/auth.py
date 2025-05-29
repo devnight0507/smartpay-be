@@ -3,19 +3,30 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.api.dependencies import authenticate_user, get_current_active_user
+from app.api.dependencies import (
+    authenticate_user,
+    check_rate_limit,
+    get_current_active_user,
+)
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
 from app.db.models.models import User, VerificationCode, Wallet
 from app.db.session import get_db
-from app.schemas.schemas import NotifSettingUpdate, Token
+from app.schemas.schemas import (
+    ForgotPasswordRequest,
+    ForgotPasswordReset,
+    ForgotPasswordResponse,
+    ForgotPasswordVerifyCode,
+    NotifSettingUpdate,
+    Token,
+)
 from app.schemas.schemas import User as UserSchema
 from app.schemas.schemas import UserCreate, VerificationRequest, VerificationResponse
 
@@ -196,31 +207,6 @@ async def update_notif_setting(
     }
 
 
-# async def update_notif_setting(
-#     setting_data: NotifSettingUpdate,
-#     db: AsyncSession = Depends(get_db),
-#     current_user: User = Depends(get_current_active_user),
-# ) -> Any:
-#     """Update current authenticated user notification setting."""
-#     logger.info(f"Updating notification setting for user ID: {current_user.id}")
-
-#     # # Validate setting value
-#     # valid_settings = ["system", "both", "phone", "email", "none"]
-#     # if setting_data.notif_setting not in valid_settings:
-#     #     raise HTTPException(status_code=400, detail=f"Invalid setting. Must be one of: {valid_settings}")
-#     # Update user's notification setting
-#     str(current_user.notif_setting) == setting_data.notif_setting
-#     await db.commit()
-#     await db.refresh(current_user)
-
-#     logger.info(f"Updated notification setting to: {setting_data.notif_setting}")
-
-#     return {
-#         "message": "Notification setting updated successfully",
-#         "notif_setting": current_user.notif_setting,
-#     }
-
-
 @router.post("/verify/{verification_type}", response_model=VerificationResponse)
 async def verify_user(
     verification_type: str,
@@ -325,16 +311,28 @@ async def resend_verification(
 
 
 async def create_verification_code(db: AsyncSession, user_id: str, verification_type: str) -> VerificationCode:
-    """Create a verification code."""
+    """
+    Create a verification code.
+
+    Args:
+        db: Database session
+        user_id: User ID
+        verification_type: Type of verification ("email", "phone", "password_reset")
+    """
     import random
     import string
 
     # Generate a random 6-digit code
     code = "".join(random.choices(string.digits, k=6))
 
-    # Set expiration time (1 hour)
-    expires_at = datetime.utcnow() + timedelta(hours=1)
+    # Set expiration time based on type
+    if verification_type == "password_reset":
+        expires_at = datetime.utcnow() + timedelta(minutes=15)  # Shorter expiry for security
+    else:
+        expires_at = datetime.utcnow() + timedelta(hours=1)  # Default 1 hour
+
     verification_id = str(uuid4())
+
     # Create verification code
     db_verification_code = VerificationCode(
         id=verification_id,
@@ -350,7 +348,7 @@ async def create_verification_code(db: AsyncSession, user_id: str, verification_
     await db.refresh(db_verification_code)
 
     # In a real application, you would send the code via email or SMS here
-    print(f"Verification code for user {user_id}: {code}")
+    logger.info(f"Verification code created for user {user_id} ({verification_type}): {code}")
 
     return db_verification_code
 
@@ -401,3 +399,186 @@ async def get_user(
             "created_at": user.created_at,
             "updated_at": user.updated_at,
         }
+
+
+@router.post(
+    "/forgot-password/send-code",
+    response_model=ForgotPasswordResponse,
+    summary="Step 1: Send password reset verification code",
+)
+async def send_password_reset_code(
+    request_data: ForgotPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    Step 1: Send password reset verification code to user's email.
+
+    Rate Limited: 3 attempts per hour per email address.
+    """
+    # Apply rate limiting
+    await check_rate_limit(
+        request=request,
+        db=db,
+        email=request_data.email,
+        endpoint="forgot_password_send_code",
+        max_attempts=3,
+        window_minutes=60,
+    )
+
+    # Check if user exists
+    query = select(User).where(User.email == request_data.email)
+    result = await db.execute(query)
+    user = result.scalars().first()
+
+    if not user:
+        # For security, don't reveal if email exists or not
+        return ForgotPasswordResponse(
+            success=True,
+            message="If this email exists, you will receive a password reset code",
+            verified_code="",
+        )
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account is deactivated. Contact support.")
+
+    # Create password reset verification code
+    verification = await create_verification_code(db, str(user.id), "password_reset")
+
+    # In production, send email here
+    # await send_password_reset_email(user.email, verification.code)
+    logger.info(f"Password reset code for {request_data.email}: {verification.code}")
+
+    return ForgotPasswordResponse(
+        success=True, message="Password reset code sent to your email", verified_code=str(verification.code)
+    )
+
+
+@router.post(
+    "/forgot-password/verify-code",
+    response_model=ForgotPasswordResponse,
+    summary="Step 2: Verify password reset code",
+)
+async def verify_password_reset_code(
+    verify_data: ForgotPasswordVerifyCode,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    Step 2: Verify the password reset code.
+
+    Rate Limited: 5 attempts per 30 minutes per email address.
+    """
+    # Apply rate limiting
+    await check_rate_limit(
+        request=request,
+        db=db,
+        email=verify_data.email,
+        endpoint="forgot_password_verify_code",
+        max_attempts=5,
+        window_minutes=30,
+    )
+
+    # Check if user exists
+    query = select(User).where(User.email == verify_data.email)
+    result = await db.execute(query)
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Get the latest verification code for password reset
+    query = (
+        select(VerificationCode)
+        .where(
+            VerificationCode.user_id == user.id,
+            VerificationCode.type == "password_reset",
+            VerificationCode.is_used.is_(False),
+            VerificationCode.expires_at > datetime.utcnow(),
+        )
+        .order_by(VerificationCode.created_at.desc())
+    )
+
+    result = await db.execute(query)
+    verification_code = result.scalars().first()
+
+    if not verification_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid verification code found or code has expired"
+        )
+
+    if verification_code.code != verify_data.verify_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
+
+    return ForgotPasswordResponse(
+        success=True, message="Verification code is valid", verified_code=verify_data.verify_code
+    )
+
+
+@router.post(
+    "/forgot-password/reset-password",
+    response_model=ForgotPasswordResponse,
+    summary="Step 3: Reset password with verified code",
+)
+async def reset_password_with_code(
+    reset_data: ForgotPasswordReset,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    Step 3: Reset password using verified code.
+
+    Rate Limited: 3 attempts per hour per email address.
+    """
+    # Apply rate limiting
+    await check_rate_limit(
+        request=request,
+        db=db,
+        email=reset_data.email,
+        endpoint="forgot_password_reset",
+        max_attempts=6,
+        window_minutes=60,
+    )
+
+    # Check if user exists
+    query = select(User).where(User.email == reset_data.email)
+    result = await db.execute(query)
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Get and verify the code again (security best practice)
+    query = (
+        select(VerificationCode)
+        .where(
+            VerificationCode.user_id == user.id,
+            VerificationCode.type == "password_reset",
+            VerificationCode.is_used.is_(False),
+            VerificationCode.expires_at > datetime.utcnow(),
+        )
+        .order_by(VerificationCode.created_at.desc())
+    )
+
+    result = await db.execute(query)
+    verification_code = result.scalars().first()
+
+    if not verification_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid verification code found or code has expired"
+        )
+
+    if verification_code.code != reset_data.verify_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
+
+    # Update user's password
+    user.hashed_password = get_password_hash(reset_data.new_password)  # type: ignore
+
+    # Mark verification code as used
+    verification_code.is_used = True  # type: ignore
+
+    await db.commit()
+
+    return ForgotPasswordResponse(
+        success=True, message="Password has been reset successfully", verified_code=reset_data.verify_code
+    )

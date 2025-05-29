@@ -19,15 +19,9 @@ from app.api.routes.v1.admin import router as admin_router
 from app.api.routes.v1.auth import router as auth_router
 from app.api.routes.v1.endpoints.errors import router as errors_router
 from app.api.routes.v1.endpoints.health import router as health_router
-
-# from app.api.routes.v1.endpoints.websockets.notifications import (
-#     router as websocket_router,
-# )
 from app.api.routes.v1.notifications import router as notification_router
 from app.api.routes.v1.paymentCard import router as paymentCard_router
 from app.api.routes.v1.profile import router as profile_router
-
-# from app.api.routes.v1.setting import router as notification_setting_router
 from app.api.routes.v1.wallet import router as wallet_router
 from app.core.config import settings
 from app.core.logging import configure_logging
