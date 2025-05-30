@@ -1,11 +1,14 @@
 import logging
+import os
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 
+from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -16,19 +19,41 @@ from app.api.dependencies import (
     get_current_active_user,
 )
 from app.core.config import settings
-from app.core.security import create_access_token, get_password_hash
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    get_password_hash,
+)
 from app.db.models.models import User, VerificationCode, Wallet
 from app.db.session import get_db
 from app.schemas.schemas import (
+    AccessTokenOnly,
     ForgotPasswordRequest,
     ForgotPasswordReset,
     ForgotPasswordResponse,
     ForgotPasswordVerifyCode,
     NotifSettingUpdate,
+    RefreshRequest,
     Token,
 )
 from app.schemas.schemas import User as UserSchema
 from app.schemas.schemas import UserCreate, VerificationRequest, VerificationResponse
+
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
+ALGORITHM = "HS256"
+
+raw_key = os.getenv("ENCRYPTION_KEY")
+
+# Generate a valid Fernet key if missing or invalid
+if not raw_key or len(raw_key.encode()) != 44:
+    raw_key = Fernet.generate_key().decode()
+    # Optionally: print this so you can save it
+    print(f"⚠️ Generated a new ENCRYPTION_KEY: {raw_key}")
+
+assert raw_key is not None
+ENCRYPTION_KEY = raw_key.encode()
+
+fernet = Fernet(ENCRYPTION_KEY)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +70,7 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Register a new user."""
-    logger.warning("register!!")
+    logger.info("Hello file logs!")
 
     # Convert empty strings to None for proper NULL handling
     email = user_in.email if user_in.email and user_in.email.strip() else None
@@ -147,9 +172,31 @@ async def login(
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(subject=user.id, expires_delta=access_token_expires)
+    refresh_token_expires = timedelta(days=1)  # or from settings.REFRESH_TOKEN_EXPIRE_DAYS
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token = create_access_token(subject=user.id, expires_delta=access_token_expires)
+    refresh_token = create_refresh_token(subject=user.id, expires_delta=refresh_token_expires)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": refresh_token,
+    }
+
+
+@router.post("/refresh-token", response_model=AccessTokenOnly)
+async def refresh_token(data: RefreshRequest) -> dict:
+    token = data.refresh_token
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    new_access_token = create_access_token(subject=payload["sub"], expires_delta=timedelta(minutes=15))
+    return {"access_token": new_access_token, "token_type": "bearer"}
 
 
 @router.get(
@@ -327,7 +374,7 @@ async def create_verification_code(db: AsyncSession, user_id: str, verification_
 
     # Set expiration time based on type
     if verification_type == "password_reset":
-        expires_at = datetime.utcnow() + timedelta(minutes=15)  # Shorter expiry for security
+        expires_at = datetime.utcnow() + timedelta(minutes=1)  # Shorter expiry for security
     else:
         expires_at = datetime.utcnow() + timedelta(hours=1)  # Default 1 hour
 
@@ -457,68 +504,105 @@ async def send_password_reset_code(
 @router.post(
     "/forgot-password/verify-code",
     response_model=ForgotPasswordResponse,
-    summary="Step 2: Verify password reset code",
+    summary="Step 2: Verify password reset code and get token",
 )
 async def verify_password_reset_code(
     verify_data: ForgotPasswordVerifyCode,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    """
-    Step 2: Verify the password reset code.
 
-    Rate Limited: 5 attempts per 30 minutes per email address.
-    """
-    # Apply rate limiting
-    await check_rate_limit(
-        request=request,
-        db=db,
-        email=verify_data.email,
-        endpoint="forgot_password_verify_code",
-        max_attempts=5,
-        window_minutes=30,
-    )
+    # ============ UTILITY FUNCTIONS INSIDE THIS FUNCTION ============
+    def encrypt_email(email: str) -> str:
+        """Encrypt email address"""
+        return str(fernet.encrypt(email.encode()).decode())
 
-    # Check if user exists
-    query = select(User).where(User.email == verify_data.email)
-    result = await db.execute(query)
-    user = result.scalars().first()
+    def create_reset_token(email: str, expires_delta: timedelta = timedelta(minutes=1)) -> str:
+        """Create JWT token with encrypted email"""
+        encrypted_email = encrypt_email(email)
+        expire = datetime.utcnow() + expires_delta
+        to_encode = {
+            "encrypted_email": encrypted_email,
+            "exp": expire,
+            "type": "password_reset",
+            "iat": datetime.utcnow(),
+        }
+        return str(jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM))
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # ================================================================
 
-    # Get the latest verification code for password reset
-    query = (
-        select(VerificationCode)
-        .where(
-            VerificationCode.user_id == user.id,
-            VerificationCode.type == "password_reset",
-            VerificationCode.is_used.is_(False),
-            VerificationCode.expires_at > datetime.utcnow(),
-        )
-        .order_by(VerificationCode.created_at.desc())
-    )
-
-    result = await db.execute(query)
-    verification_code = result.scalars().first()
-
-    if not verification_code:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid verification code found or code has expired"
+    try:
+        # Apply rate limiting
+        await check_rate_limit(
+            request=request,
+            db=db,
+            email=verify_data.email,
+            endpoint="forgot_password_verify_code",
+            max_attempts=5,
+            window_minutes=30,
         )
 
-    if verification_code.code != verify_data.verify_code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
+        # Check if user exists
+        query = select(User).where(User.email == verify_data.email)
+        result = await db.execute(query)
+        user = result.scalars().first()
 
-    return ForgotPasswordResponse(
-        success=True, message="Verification code is valid", verified_code=verify_data.verify_code
-    )
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Account is deactivated. Contact support."
+            )
+
+        # Get the latest verification code for password reset
+        query = (
+            select(VerificationCode)
+            .where(
+                VerificationCode.user_id == user.id,
+                VerificationCode.type == "password_reset",
+                VerificationCode.is_used.is_(False),
+                VerificationCode.expires_at > datetime.utcnow(),
+            )
+            .order_by(VerificationCode.created_at.desc())
+        )
+
+        result = await db.execute(query)
+        verification_code = result.scalars().first()
+
+        if not verification_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No valid verification code found or code has expired"
+            )
+
+        if verification_code.code != verify_data.verify_code:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
+
+        # Create JWT token with encrypted email (15 minutes expiry)
+        reset_token = create_reset_token(user.email, expires_delta=timedelta(minutes=15))  # type: ignore
+
+        return ForgotPasswordResponse(
+            success=True,
+            message="Verification code is valid. Use the token to reset your password.",
+            token=reset_token,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in verify_password_reset_code: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Debug Info: {str(e)}")
+
+
+# ====================================================================
+# FUNCTION 2: RESET PASSWORD WITH JWT TOKEN
+# ====================================================================
 
 
 @router.post(
     "/forgot-password/reset-password",
     response_model=ForgotPasswordResponse,
-    summary="Step 3: Reset password with verified code",
+    summary="Step 3: Reset password with JWT token",
 )
 async def reset_password_with_code(
     reset_data: ForgotPasswordReset,
@@ -526,59 +610,109 @@ async def reset_password_with_code(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
-    Step 3: Reset password using verified code.
-
-    Rate Limited: 3 attempts per hour per email address.
+    Step 3: Reset password using JWT token.
+    Rate Limited: 6 attempts per hour per email address.
     """
-    # Apply rate limiting
-    await check_rate_limit(
-        request=request,
-        db=db,
-        email=reset_data.email,
-        endpoint="forgot_password_reset",
-        max_attempts=6,
-        window_minutes=60,
-    )
 
-    # Check if user exists
-    query = select(User).where(User.email == reset_data.email)
-    result = await db.execute(query)
-    user = result.scalars().first()
+    # ============ UTILITY FUNCTIONS INSIDE THIS FUNCTION ============
+    def decrypt_email(encrypted_email: str) -> str:
+        """Decrypt email address"""
+        return str(fernet.decrypt(encrypted_email.encode()).decode())
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    def verify_reset_token(token: str) -> Optional[str]:
+        """Verify JWT token and return decrypted email"""
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            encrypted_email: str = payload.get("encrypted_email")
+            token_type: str = payload.get("type")
 
-    # Get and verify the code again (security best practice)
-    query = (
-        select(VerificationCode)
-        .where(
-            VerificationCode.user_id == user.id,
-            VerificationCode.type == "password_reset",
-            VerificationCode.is_used.is_(False),
-            VerificationCode.expires_at > datetime.utcnow(),
+            if encrypted_email is None or token_type != "password_reset":
+                return None
+
+            # Decrypt email
+            email = decrypt_email(encrypted_email)
+            return email
+
+        except JWTError:
+            return None
+        except Exception:  # Decryption error
+            return None
+
+    def validate_password_strength(password: str) -> tuple[bool, str]:
+        """Validate password strength and return (is_valid, error_message)"""
+        if len(password) < 8:
+            return False, "Password must be at least 8 characters long"
+
+        if not any(c.islower() for c in password):
+            return False, "Password must contain at least one lowercase letter"
+
+        return True, ""
+
+    # ================================================================
+
+    try:
+        # 1. Verify and decode the JWT token to get user's email
+        email = verify_reset_token(reset_data.token)
+        if not email:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+
+        # 2. Apply rate limiting using the decoded email
+        await check_rate_limit(
+            request=request,
+            db=db,
+            email=email,
+            endpoint="forgot_password_reset",
+            max_attempts=6,
+            window_minutes=60,
         )
-        .order_by(VerificationCode.created_at.desc())
-    )
 
-    result = await db.execute(query)
-    verification_code = result.scalars().first()
+        # 3. Find user by the decrypted email
+        query = select(User).where(User.email == email)
+        result = await db.execute(query)
+        user = result.scalars().first()
 
-    if not verification_code:
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Account is deactivated. Contact support."
+            )
+
+        # 4. Validate that there's still a valid verification code
+        query = (
+            select(VerificationCode)
+            .where(
+                VerificationCode.user_id == user.id,
+                VerificationCode.type == "password_reset",
+                VerificationCode.is_used.is_(False),
+                VerificationCode.expires_at > datetime.utcnow(),
+            )
+            .order_by(VerificationCode.created_at.desc())
+        )
+
+        result = await db.execute(query)
+
+        # 5. Validate new password strength
+        is_valid, error_msg = validate_password_strength(reset_data.newpassword)
+        if not is_valid:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
+
+        # 6. Update user's password
+        user.hashed_password = get_password_hash(reset_data.newpassword)  # type: ignore
+
+        # 8. Commit all changes to database
+        await db.commit()
+
+        logger.info(f"Password successfully reset for user: {email}")
+
+        return ForgotPasswordResponse(success=True, message="Password has been reset successfully", token=None)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in reset_password_with_code: {str(e)}")
+        await db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid verification code found or code has expired"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred while resetting the password"
         )
-
-    if verification_code.code != reset_data.verify_code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code")
-
-    # Update user's password
-    user.hashed_password = get_password_hash(reset_data.new_password)  # type: ignore
-
-    # Mark verification code as used
-    verification_code.is_used = True  # type: ignore
-
-    await db.commit()
-
-    return ForgotPasswordResponse(
-        success=True, message="Password has been reset successfully", verified_code=reset_data.verify_code
-    )

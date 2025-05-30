@@ -77,13 +77,23 @@ class Token(BaseModel):
     """Token schema."""
 
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class AccessTokenOnly(BaseModel):
+    access_token: str
+    token_type: str
 
 
 class TokenPayload(BaseModel):
     """Token payload schema."""
 
     sub: Optional[str] = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class NotifSettingUpdate(BaseModel):
@@ -510,65 +520,17 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class ForgotPasswordVerifyCode(BaseModel):
-    """Step 2: Verify the reset code."""
-
     email: EmailStr
-    verify_code: str = Field(..., min_length=6, max_length=6)
-
-    @validator("verify_code")
-    def validate_verify_code(cls, v: str) -> str:
-        """Validate verification code is exactly 6 digits."""
-        if not v.isdigit():
-            raise ValueError("Verification code must be numeric")
-        if len(v) != 6:
-            raise ValueError("Verification code must be exactly 6 digits")
-        return v
-
-    class Config:
-        json_schema_extra = {"example": {"email": "user@example.com", "verify_code": "123456"}}
+    verify_code: str = Field(..., min_length=4, max_length=8)
 
 
 class ForgotPasswordReset(BaseModel):
-    """Step 3: Reset password with verified code."""
-
-    email: EmailStr
-    verify_code: str = Field(..., min_length=6, max_length=6)
-    new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")
-    confirm_password: str = Field(..., min_length=8, description="Confirm new password")
-
-    @validator("verify_code")
-    def validate_verify_code(cls, v: str) -> str:
-        """Validate verification code is exactly 6 digits."""
-        if not v.isdigit():
-            raise ValueError("Verification code must be numeric")
-        if len(v) != 6:
-            raise ValueError("Verification code must be exactly 6 digits")
-        return v
-
-    @validator("confirm_password")
-    def passwords_match(cls, v: str, values: dict) -> str:
-        """Validate that passwords match."""
-        if "new_password" in values and v != values["new_password"]:
-            raise ValueError("Passwords do not match")
-        return v
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "email": "user@example.com",
-                "verify_code": "123456",
-                "new_password": "newPassword123",
-                "confirm_password": "newPassword123",
-            }
-        }
+    token: str
+    newpassword: str = Field(..., min_length=8)
 
 
 class ForgotPasswordResponse(BaseModel):
-    """Generic response for forgot password operations."""
-
     success: bool
     message: str
-    verified_code: str
-
-    class Config:
-        json_schema_extra = {"example": {"success": True, "message": "Password reset code sent to your email"}}
+    token: Optional[str] = None
+    verified_code: Optional[str] = None

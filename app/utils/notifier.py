@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.models import Notification
+from app.utils.connection_manager import manager
 
 
 async def notify_user(
@@ -44,13 +45,17 @@ async def notify_user(
     await db.commit()
     await db.refresh(notification)
 
-    return {
+    response_data = {
         "id": notification.id,
         "user_id": notification.user_id,
         "title": notification.title,
         "message": notification.message,
         "type": notification.type,
-        "is_read": notification.is_read,
-        "created_at": notification.created_at,
+        "read": notification.is_read,
+        "timestamp": notification.created_at.isoformat(),
         "extra_data": notification.extra_data,
     }
+
+    await manager.send_personal_message(user_id, {"event": "new_notification", "data": response_data})
+
+    return response_data

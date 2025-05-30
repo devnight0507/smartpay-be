@@ -23,6 +23,7 @@ from app.api.routes.v1.notifications import router as notification_router
 from app.api.routes.v1.paymentCard import router as paymentCard_router
 from app.api.routes.v1.profile import router as profile_router
 from app.api.routes.v1.wallet import router as wallet_router
+from app.api.websockets.notifications_ws import router as socket_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 
@@ -124,7 +125,7 @@ def create_application() -> FastAPI:
     application.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
     application.include_router(paymentCard_router, prefix="/api/v1/payment-cards", tags=["Payment Card"])
     application.include_router(errors_router, prefix="/api/v1", tags=["Errors"])
-    # application.include_router(websocket_router, prefix="/api/v1/ws", tags=["WebSockets"])
+    application.include_router(socket_router, tags=["WebSockets"])
 
     return application
 
