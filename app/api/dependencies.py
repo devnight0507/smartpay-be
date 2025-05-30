@@ -2,11 +2,14 @@
 FastAPI API dependencies.
 """
 
+from datetime import datetime, timedelta
 from typing import AsyncGenerator, Callable, Dict, Optional
+from uuid import uuid4
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from sqlalchemy import and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -138,3 +141,72 @@ def require_roles(roles: list[str]) -> Callable:
         return current_user
 
     return _require_roles
+
+
+async def check_rate_limit(
+    request: Request, db: AsyncSession, email: str, endpoint: str, max_attempts: int = 3, window_minutes: int = 60
+) -> None:
+    """
+    Check if the email has exceeded rate limit for the specific endpoint.
+
+    Args:
+        request: FastAPI request object
+        db: Database session
+        email: Email address to check
+        endpoint: Endpoint identifier (e.g., "forgot_password_send_code")
+        max_attempts: Maximum attempts allowed (default: 3)
+        window_minutes: Time window in minutes (default: 60)
+
+    Raises:
+        HTTPException: If rate limit is exceeded
+    """
+    # Import here to avoid circular imports
+    from app.db.models.models import RateLimitLog
+
+    # Calculate the time window
+    window_start = datetime.utcnow() - timedelta(minutes=window_minutes)
+
+    # Count recent attempts for this email and endpoint
+    query = select(func.count(RateLimitLog.id)).where(
+        and_(RateLimitLog.email == email, RateLimitLog.endpoint == endpoint, RateLimitLog.created_at >= window_start)
+    )
+
+    result = await db.execute(query)
+    attempt_count = result.scalar() or 0  # Handle None case
+
+    if attempt_count >= max_attempts:
+        # Calculate time until next attempt is allowed
+        query_latest = (
+            select(RateLimitLog.created_at)
+            .where(
+                and_(
+                    RateLimitLog.email == email,
+                    RateLimitLog.endpoint == endpoint,
+                    RateLimitLog.created_at >= window_start,
+                )
+            )
+            .order_by(RateLimitLog.created_at.asc())
+            .limit(1)
+        )
+
+        result_latest = await db.execute(query_latest)
+        oldest_attempt = result_latest.scalar()
+
+        if oldest_attempt:
+            time_until_reset = oldest_attempt + timedelta(minutes=window_minutes)
+            minutes_remaining = int((time_until_reset - datetime.utcnow()).total_seconds() / 60)
+
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many attempts. Try again in {max(1, minutes_remaining)} minutes.",
+            )
+
+    # Log this attempt
+    client_ip = request.client.host if request.client else "unknown"
+
+    rate_limit_log = RateLimitLog(
+        id=str(uuid4()), email=email, endpoint=endpoint, ip_address=client_ip, created_at=datetime.utcnow()
+    )
+
+    db.add(rate_limit_log)
+    await db.commit()

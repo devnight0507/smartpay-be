@@ -10,7 +10,7 @@ from app.api.dependencies import (
     get_user_by_phone,
 )
 from app.core.security import get_password_hash
-from app.db.models.models import Transaction, User, Wallet
+from app.db.models.models import PaymentCard, Transaction, User, Wallet
 from app.db.session import get_db
 from app.main import app
 
@@ -42,7 +42,25 @@ async def setup_wallets(db_session: AsyncSession):
     db_session.add_all([sender_wallet, recipient_wallet])
     await db_session.commit()
 
-    return sender, recipient
+    import hashlib
+
+    hashed = hashlib.sha256("4111111111111111".encode()).hexdigest()
+    sender_card = PaymentCard(
+        user_id=sender.id,
+        name="Sender Name",
+        card_number_hash=hashed,
+        masked_card_number="**** **** **** 1111",
+        expire_date="12/50",
+        cvc_hash=hashlib.sha256("123".encode()).hexdigest(),  # Store hashed version
+        is_default=True,
+        card_type="visa",
+        card_color="bg-blue-500",
+        is_deleted=False,
+    )
+    db_session.add_all([sender_card])
+    await db_session.commit()
+
+    return sender, recipient, sender_card
 
 
 @pytest.fixture
@@ -72,12 +90,12 @@ async def setup_user_no_wallet(db_session: AsyncSession):
 
 @pytest.fixture
 async def override_wallet_deps(db_session: AsyncSession, setup_wallets):
-    sender, recipient = setup_wallets
+    sender, recipient, sender_card = setup_wallets
     app.dependency_overrides[get_db] = lambda: db_session
     app.dependency_overrides[get_current_verified_user] = lambda: sender
     app.dependency_overrides[get_user_by_email] = lambda db, email: None
     app.dependency_overrides[get_user_by_phone] = lambda db, phone: recipient
-    return sender, recipient
+    return sender, recipient, sender_card
 
 
 @pytest.fixture(autouse=True)
@@ -95,7 +113,8 @@ async def test_get_balance(client: AsyncClient, override_wallet_deps):
 
 @pytest.mark.anyio
 async def test_top_up_wallet(client: AsyncClient, override_wallet_deps):
-    response = await client.post("/api/v1/wallet/top-up", json={"amount": 50})
+    _, _, sender_card = override_wallet_deps
+    response = await client.post("/api/v1/wallet/deposit", json={"amount": 50, "card_id": sender_card.id})
     assert response.status_code == 200
     assert response.json()["balance"] == 150.0
 
@@ -110,7 +129,7 @@ async def test_transfer_money(client: AsyncClient, override_wallet_deps):
 
 @pytest.mark.anyio
 async def test_get_transactions(client: AsyncClient, db_session: AsyncSession, override_wallet_deps):
-    sender, recipient = override_wallet_deps
+    sender, recipient, _ = override_wallet_deps
     tx = Transaction(
         id=str(uuid4()), sender_id=sender.id, recipient_id=recipient.id, amount=30, type="transfer", status="completed"
     )
@@ -151,7 +170,7 @@ async def test_transfer_insufficient_balance(client: AsyncClient, override_walle
 
 @pytest.mark.anyio
 async def test_transfer_recipient_not_found(client: AsyncClient, db_session, setup_wallets):
-    sender, _ = setup_wallets
+    sender, _, _ = setup_wallets
     app.dependency_overrides[get_db] = lambda: db_session
     app.dependency_overrides[get_current_verified_user] = lambda: sender
     app.dependency_overrides[get_user_by_email] = lambda db, email: None

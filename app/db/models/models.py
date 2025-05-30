@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
@@ -16,6 +17,7 @@ class User(Base):
     fullname = Column(String, nullable=True)
     email = Column(String, unique=True, index=True, nullable=True)
     phone = Column(String, unique=True, index=True, nullable=True)
+    notif_setting = Column(String, nullable=True, default="system")
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
@@ -33,6 +35,7 @@ class User(Base):
     )
     verification_codes = relationship("VerificationCode", back_populates="user")
     payment_cards = relationship("PaymentCard", back_populates="user")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 
 class Wallet(Base):
@@ -59,6 +62,7 @@ class Transaction(Base):
     sender_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     recipient_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     amount = Column(Float, nullable=False)
+    card_id = Column(String, nullable=True)
     description = Column(String, nullable=True)
     type = Column(String, nullable=False)  # "transfer", "deposit", "withdrawal"
     status = Column(String, default="completed")  # "pending", "completed", "failed"
@@ -105,3 +109,33 @@ class PaymentCard(Base):
 
     # Relationship
     user = relationship("User", back_populates="payment_cards")
+
+
+class Notification(Base):
+    """Notification model."""
+
+    __tablename__ = "notifications"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(String, nullable=False)
+    type = Column(String(50), default="system")  # e.g., "transaction", "system"
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    extra_data = Column(JSONB, nullable=True)
+
+    # Relationship
+    user = relationship("User", back_populates="notifications")
+
+
+class RateLimitLog(Base):
+    """Rate limiting log for tracking API requests."""
+
+    __tablename__ = "rate_limit_logs"
+
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
+    email = Column(String, nullable=False, index=True)
+    endpoint = Column(String, nullable=False)  # e.g., "forgot_password_send_code"
+    ip_address = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
