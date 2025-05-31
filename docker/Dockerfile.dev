@@ -23,16 +23,11 @@ RUN pip install --no-cache-dir poetry==1.7.1
 # Configure poetry to not use virtualenvs inside Docker
 RUN poetry config virtualenvs.create false
 
-# Copy pyproject.toml and poetry.lock*
-COPY pyproject.toml poetry.lock* /app/
+# Copy all code (including pyproject.toml)
+COPY . /app/
 
 # Install dependencies
 RUN poetry install --no-interaction --no-root
-
-# Copy application code
-COPY app /app/app
-COPY alembic /app/alembic
-COPY alembic.ini /app/
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
