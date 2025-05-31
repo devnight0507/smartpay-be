@@ -53,7 +53,7 @@ def test_payment_card_base_valid():
 
 
 def test_payment_card_base_invalid_expired():
-    expired = (datetime.now() - timedelta(days=30)).strftime("%m/%y")
+    expired = (datetime.now() - timedelta(days=31)).strftime("%m/%y")
     with pytest.raises(ValidationError) as exc:
         schemas.PaymentCardBase(name="Test", cardNumber="4111111111111111", expireDate=expired, cvc="123")
     assert "Card has expired" in str(exc.value)
