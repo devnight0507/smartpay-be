@@ -59,7 +59,7 @@ class UserInDBBase(UserBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    verify_code: Optional[str] = None
+    # verify_code: Optional[str] = None
 
     class Config:
         """Pydantic config."""
@@ -533,4 +533,4 @@ class ForgotPasswordResponse(BaseModel):
     success: bool
     message: str
     token: Optional[str] = None
-    verified_code: Optional[str] = None
+    # verified_code: Optional[str] = None

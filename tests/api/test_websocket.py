@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi import WebSocketDisconnect
 
-from app.api.websockets import ConnectionManager, WebSocketMessage
+from app.api.originalwebsockets import ConnectionManager, WebSocketMessage
 
 
 @pytest.mark.asyncio

@@ -38,6 +38,7 @@ from app.schemas.schemas import (
 )
 from app.schemas.schemas import User as UserSchema
 from app.schemas.schemas import UserCreate, VerificationRequest, VerificationResponse
+from app.utils.resend_mailer import send_verification_code
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
@@ -130,6 +131,8 @@ async def register(
     verification = None
     if email:
         verification = await create_verification_code(db, str(db_user.id), "email")
+        await send_verification_code(str(db_user.email), str(verification.code))
+
     elif phone:
         verification = await create_verification_code(db, str(db_user.id), "phone")
 
@@ -141,7 +144,6 @@ async def register(
         "is_active": db_user.is_active,
         "is_admin": db_user.is_admin,
         "is_verified": db_user.is_verified,
-        "verify_code": verification.code if verification else None,
         "created_at": db_user.created_at,
         "updated_at": db_user.updated_at,
     }
@@ -353,8 +355,9 @@ async def resend_verification(
         )
 
     verification = await create_verification_code(db, str(current_user.id), verification_type)
+    await send_verification_code(str(current_user.email), str(verification.code))
 
-    return {"message": f"Verification code sent via {verification_type}", "verification_code": verification.code}
+    return {"message": f"Verification code sent via {verification_type}"}
 
 
 async def create_verification_code(db: AsyncSession, user_id: str, verification_type: str) -> VerificationCode:
@@ -483,7 +486,6 @@ async def send_password_reset_code(
         return ForgotPasswordResponse(
             success=True,
             message="If this email exists, you will receive a password reset code",
-            verified_code="",
         )
 
     if not user.is_active:
@@ -491,14 +493,12 @@ async def send_password_reset_code(
 
     # Create password reset verification code
     verification = await create_verification_code(db, str(user.id), "password_reset")
-
+    await send_verification_code(str(request_data.email), str(verification.code))
     # In production, send email here
     # await send_password_reset_email(user.email, verification.code)
     logger.info(f"Password reset code for {request_data.email}: {verification.code}")
 
-    return ForgotPasswordResponse(
-        success=True, message="Password reset code sent to your email", verified_code=str(verification.code)
-    )
+    return ForgotPasswordResponse(success=True, message="Password reset code sent to your email")
 
 
 @router.post(

@@ -126,6 +126,7 @@ def create_application() -> FastAPI:
     application.include_router(paymentCard_router, prefix="/api/v1/payment-cards", tags=["Payment Card"])
     application.include_router(errors_router, prefix="/api/v1", tags=["Errors"])
     application.include_router(socket_router, tags=["WebSockets"])
+    application.get("/test-mail/")
 
     return application
 
