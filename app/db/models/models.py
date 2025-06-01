@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, String
@@ -22,8 +22,12 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     # Relationships
     wallet = relationship("Wallet", back_populates="user", uselist=False)
@@ -46,8 +50,12 @@ class Wallet(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid4()))
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     balance = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     # Relationships
     user = relationship("User", back_populates="wallet")
@@ -66,7 +74,7 @@ class Transaction(Base):
     description = Column(String, nullable=True)
     type = Column(String, nullable=False)  # "transfer", "deposit", "withdrawal"
     status = Column(String, default="completed")  # "pending", "completed", "failed"
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     sender = relationship("User", back_populates="sent_transactions", foreign_keys=[sender_id])
@@ -84,7 +92,7 @@ class VerificationCode(Base):
     type = Column(String, nullable=False)  # "email", "phone"
     expires_at = Column(DateTime, nullable=False)
     is_used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user = relationship("User", back_populates="verification_codes")
@@ -104,8 +112,12 @@ class PaymentCard(Base):
     card_type = Column(String(20), nullable=False)  # visa, mastercard, amex, etc.
     card_color = Column(String(50), default="bg-blue-500", nullable=False)
     is_deleted = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     # Relationship
     user = relationship("User", back_populates="payment_cards")
@@ -122,7 +134,7 @@ class Notification(Base):
     message = Column(String, nullable=False)
     type = Column(String(50), default="system")  # e.g., "transaction", "system"
     is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     extra_data = Column(JSONB, nullable=True)
 
     # Relationship

@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 
+# import logging
 import resend
 from dotenv import load_dotenv
 
@@ -9,6 +10,8 @@ load_dotenv()
 
 MAIL_MODE = os.getenv("MAIL_MODE", "dev")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+# EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+# APP_PASSWORD = os.getenv("APP_PASSWORD")
 
 resend.api_key = RESEND_API_KEY  # Always set it
 
@@ -37,3 +40,22 @@ async def send_verification_code(to_email: str, code: str) -> dict:
             return {"status": "sent", "mode": "mailpit", "to": to_email}
         except Exception as e:
             return {"status": "error", "error": str(e)}
+
+
+# logger = logging.getLogger(__name__)
+
+# def send_verification_email(recipient: str, code: str) -> dict:
+#     msg = EmailMessage()
+#     msg["Subject"] = "Your Verification Code"
+#     msg["From"] = EMAIL_ADDRESS
+#     msg["To"] = recipient
+#     msg.set_content(f"Your verification code is: {code}")
+#     logger.info("Email verification!")
+
+#     try:
+#         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+#             smtp.login(EMAIL_ADDRESS, APP_PASSWORD)
+#             smtp.send_message(msg)
+#         return {"status": "sent", "mode": "gmail", "to": recipient}
+#     except Exception as e:
+#         return {"status": "error", "error": str(e)}
