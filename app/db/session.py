@@ -2,6 +2,7 @@
 Database session configuration.
 """
 
+import os
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -9,9 +10,14 @@ from sqlalchemy.orm import declarative_base
 
 from app.core.config import settings
 
+if "PYTEST_CURRENT_TEST" in os.environ:
+    DATABASE_URL = os.getenv("TEST_DATABASE_URL") or str(settings.DATABASE_URI)
+else:
+    DATABASE_URL = str(settings.DATABASE_URI)
+
 # Create async engine
 engine = create_async_engine(
-    str(settings.DATABASE_URI),
+    DATABASE_URL,
     echo=settings.DEBUG,
     pool_pre_ping=True,
     pool_size=10,

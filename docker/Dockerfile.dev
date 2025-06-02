@@ -33,7 +33,7 @@ RUN poetry install --no-interaction --no-root
 COPY app /app/app
 COPY alembic /app/alembic
 COPY alembic.ini /app/
-
+COPY tests /app/tests
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 

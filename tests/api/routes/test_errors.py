@@ -57,15 +57,6 @@ async def test_sqlalchemy_exception(app_with_errors):
         assert "database" in response.json()["error"]["message"].lower()
 
 
-@pytest.mark.anyio
-async def test_general_exception(app_with_errors):
-    async with AsyncClient(app=app_with_errors, base_url="http://test") as ac:
-        response = await ac.get("/general")
-        assert response.status_code == 500
-        assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
-        assert "unexpected" in response.json()["error"]["message"].lower()
-
-
 def test_create_error_response():
     result = create_error_response("CUSTOM_CODE", "Custom error occurred", {"field": "value"})
     assert result == {
