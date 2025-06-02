@@ -3,7 +3,7 @@
 PYTHON := python
 DOCKER_COMPOSE := docker-compose
 DEV_COMPOSE := docker-compose -f docker-compose.yml --env-file .env
-DEV_SERVICE := smartpay-api-dev
+DEV_SERVICE := smartpay-api
 ALEMBIC := alembic
 
 help:

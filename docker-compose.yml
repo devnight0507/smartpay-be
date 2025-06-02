@@ -1,13 +1,13 @@
 version: "3.8"
 
 services:
-  smartpay-api-dev:
+  smartpay-api:
     env_file:
       - .env
     build:
       context: .
       dockerfile: docker/Dockerfile.dev
-    container_name: smartpay-api-dev
+    container_name: smartpay-api
     volumes:
       - .:/app
       - ./logs:/app/logs
@@ -15,12 +15,12 @@ services:
       - "${API_PORT:-9000}:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
-      smartpay-postgres-dev:
+      smartpay-postgres:
         condition: service_healthy
       mailpit:
         condition: service_started
     networks:
-      - smartpay-network-dev
+      - smartpay-network
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DEBUG: ${DEBUG:-True}
@@ -41,9 +41,9 @@ services:
       retries: 3
       start_period: 10s
 
-  smartpay-postgres-dev:
+  smartpay-postgres:
     image: postgres:16
-    container_name: smartpay-postgres-dev
+    container_name: smartpay-postgres
     env_file:
       - .env
     volumes:
@@ -52,7 +52,7 @@ services:
     ports:
       - "${POSTGRES_PORT_EXTERNAL:-6432}:5432"
     networks:
-      - smartpay-network-dev
+      - smartpay-network
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secureprodpass}
@@ -63,30 +63,30 @@ services:
       timeout: 5s
       retries: 5
 
-  smartpay-pgadmin-dev:
+  smartpay-pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: smartpay-pgadmin-dev
+    container_name: smartpay-pgadmin
     depends_on:
-      - smartpay-postgres-dev
+      - smartpay-postgres
     ports:
       - "${PGADMIN_PORT:-5051}:80"
     networks:
-      - smartpay-network-dev
+      - smartpay-network
     environment:
       PGADMIN_DEFAULT_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${ADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
 
-  mailpit:                             
+  mailpit:
     image: axllent/mailpit
     container_name: mailpit
     ports:
       - "1025:1025"
       - "8025:8025"
     networks:
-      - smartpay-network-dev
+      - smartpay-network
 networks:
-  smartpay-network-dev:
+  smartpay-network:
     driver: bridge
 
 volumes:
