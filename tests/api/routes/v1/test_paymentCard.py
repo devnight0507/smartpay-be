@@ -1,72 +1,126 @@
-# from uuid import uuid4
+"""
+Simplified test file for payment cards API endpoints.
+This version focuses on core functionality with proper imports.
+"""
 
-# import pytest
-# from httpx import AsyncClient
-# from sqlalchemy.ext.asyncio import AsyncSession
+from unittest.mock import AsyncMock, Mock
 
-# from app.api.dependencies import get_current_active_user
-# from app.db.models.models import PaymentCard, User
-# from app.main import app
+import pytest
 
-
-# @pytest.fixture
-# async def card_user(db_session: AsyncSession):
-#     user = User(
-#         id=str(uuid4()),
-#         email="carduser@example.com",
-#         fullname="Card User",
-#         hashed_password="cardpass",
-#         is_verified=True,
-#         is_active=True,
-#     )
-#     db_session.add(user)
-#     await db_session.commit()
-#     return user
+# Adjust these imports to match your actual project structure
+from app.api.routes.v1.paymentCard import (
+    _detect_card_type,
+    _mask_card_number,
+    get_all_cards,
+)
 
 
-# @pytest.fixture(autouse=True)
-# def clear_dependency_overrides():
-#     yield
-#     app.dependency_overrides = {}
+class TestPaymentCards:
+    """Simplified test class for payment cards."""
 
+    @pytest.fixture
+    def mock_db(self):
+        """Mock database session."""
+        return AsyncMock()
 
-# @pytest.mark.anyio
-# async def test_add_new_card(client: AsyncClient, db_session: AsyncSession, card_user):
-#     app.dependency_overrides[get_current_active_user] = lambda: card_user
-#     payload = {
-#         "name": "My Visa",
-#         "cardNumber": "4111111111111111",
-#         "expireDate": "12/50",
-#         "cvc": "123",
-#         "isDefault": True,
-#         "type": "visa",
-#         "cardColor": "bg-blue-500",
-#     }
-#     res = await client.post("/api/v1/payment-card/", json=payload)
-#     assert res.status_code == 200
-#     assert "id" in res.json()
+    @pytest.fixture
+    def mock_user(self):
+        """Mock authenticated user."""
+        user = Mock()
+        user.id = "user-123"
+        return user
 
+    @pytest.fixture
+    def mock_card_data(self):
+        """Mock card creation data."""
+        card_data = Mock()
+        card_data.name = "Test Card"
+        card_data.cardNumber = "4111111111111111"
+        card_data.expireDate = "12/25"
+        card_data.cvc = "123"
+        card_data.isDefault = False
+        card_data.type = "visa"
+        card_data.cardColor = "bg-blue-500"
+        return card_data
 
-# @pytest.mark.anyio
-# async def test_get_all_cards(client: AsyncClient, db_session: AsyncSession, card_user):
-#     app.dependency_overrides[get_current_active_user] = lambda: card_user
-#     # Add a card first
-#     card = PaymentCard(
-#         id=str(uuid4()),
-#         user_id=card_user.id,
-#         name="Test Card",
-#         card_number_hash="hash",
-#         masked_card_number="**** **** **** 1111",
-#         expire_date="12/50",
-#         cvc_hash="hash",
-#         is_default=True,
-#         card_type="visa",
-#         card_color="bg-blue-500",
-#         is_deleted=False,
-#     )
-#     db_session.add(card)
-#     await db_session.commit()
-#     res = await client.get("/api/v1/payment-card/")
-#     assert res.status_code == 200
-#     assert isinstance(res.json(), list)
-#     assert any(c["cardNumber"] == "**** **** **** 1111" for c in res.json())
+    # Test helper functions (these don't require database)
+    def test_mask_card_number_visa(self):
+        """Test masking Visa card number."""
+        result = _mask_card_number("4111111111111111")
+        assert result == "**** **** **** 1111"
+
+    def test_mask_card_number_amex(self):
+        """Test masking American Express card number."""
+        result = _mask_card_number("371449635398431")
+        assert result == "**** ****** *8431"
+
+    def test_mask_card_number_with_spaces(self):
+        """Test masking card number with spaces."""
+        result = _mask_card_number("4111 1111 1111 1111")
+        assert result == "**** **** **** 1111"
+
+    def test_mask_card_number_short_number(self):
+        """Test masking short card number."""
+        result = _mask_card_number("123")
+        assert result == "**** **** **** ****"
+
+    def test_detect_card_type_visa(self):
+        """Test detecting Visa card type."""
+        result = _detect_card_type("4111111111111111")
+        assert result == "visa"
+
+    def test_detect_card_type_mastercard(self):
+        """Test detecting Mastercard type."""
+        result = _detect_card_type("5555555555554444")
+        assert result == "mastercard"
+
+    def test_detect_card_type_amex(self):
+        """Test detecting American Express type."""
+        result = _detect_card_type("371449635398431")
+        assert result == "amex"
+
+    def test_detect_card_type_unknown(self):
+        """Test detecting unknown card type."""
+        result = _detect_card_type("1234567890123456")
+        assert result == "unknown"
+
+    # Test database operations with mocking
+    @pytest.mark.asyncio
+    async def test_get_all_cards_empty(self, mock_db, mock_user):
+        """Test getting cards when user has none."""
+        # Mock database result
+        mock_result = Mock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db.execute.return_value = mock_result
+
+        result = await get_all_cards(db=mock_db, current_user=mock_user)
+
+        assert isinstance(result, list)
+        assert len(result) == 0
+        mock_db.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_all_cards_with_data(self, mock_db, mock_user):
+        """Test getting cards when user has cards."""
+        # Create mock card
+        mock_card = Mock()
+        mock_card.id = "card-123"
+        mock_card.name = "Test Card"
+        mock_card.masked_card_number = "**** **** **** 1234"
+        mock_card.expire_date = "12/25"
+        mock_card.is_default = True
+        mock_card.card_type = "visa"
+        mock_card.card_color = "bg-blue-500"
+
+        # Mock database result
+        mock_result = Mock()
+        mock_result.scalars.return_value.all.return_value = [mock_card]
+        mock_db.execute.return_value = mock_result
+
+        result = await get_all_cards(db=mock_db, current_user=mock_user)
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["id"] == "card-123"
+        assert result[0]["name"] == "Test Card"
+        assert result[0]["cvc"] == "***"  # Should be maske

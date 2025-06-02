@@ -1,6 +1,5 @@
 from unittest.mock import Mock
 
-import pytest
 from fastapi import Request
 
 from app.api.i18n import (
@@ -230,7 +229,7 @@ class TestGetTranslatedMessage:
 
         import unittest.mock
 
-        with unittest.mock.patch("app.api.i18n.logger") as mock_logger:
+        with unittest.mock.patch("app.api.i18n.logger"):
 
             placeholders = {"invalid": None}
             result = get_translated_message("RecordCreated", placeholders, SupportedLanguage.ENGLISH)

@@ -1,12 +1,10 @@
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException, Request
 from jose import jwt
-from sqlalchemy import func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
     authenticate_user,
@@ -15,7 +13,6 @@ from app.api.dependencies import (
     get_current_admin,
     get_current_user,
     get_current_verified_user,
-    get_db_session,
     get_user_by_email,
     get_user_by_phone,
     require_roles,
