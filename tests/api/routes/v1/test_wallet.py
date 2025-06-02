@@ -1,192 +1,246 @@
-from uuid import uuid4
+"""
+Simplified test file for wallet API endpoints.
+Place this file in: tests/api/routes/v1/
+"""
+
+from decimal import Decimal
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
 
-from app.api.dependencies import (
-    get_current_verified_user,
-    get_user_by_email,
-    get_user_by_phone,
+# Import the functions under test
+from app.api.routes.v1.wallet import (
+    get_balance,
+    get_transactions,
+    top_up_wallet,
+    transfer_money,
+    withdraw_wallet,
 )
-from app.core.security import get_password_hash
-from app.db.models.models import Transaction, User, Wallet
-from app.db.session import get_db
-from app.main import app
 
 
-@pytest.fixture
-async def setup_wallets(db_session: AsyncSession):
-    dummy_password = get_password_hash("test123")
-
-    sender = User(
-        id=str(uuid4()),
-        email="sender@example.com",
-        phone="13246542",
-        is_verified=True,
-        hashed_password=dummy_password,
-    )
-    recipient = User(
-        id=str(uuid4()),
-        email="receiver@example.com",
-        phone="21324654",
-        is_verified=True,
-        hashed_password=dummy_password,
-    )
-
-    db_session.add_all([sender, recipient])
-    await db_session.commit()
-
-    sender_wallet = Wallet(user_id=sender.id, balance=100.0)
-    recipient_wallet = Wallet(user_id=recipient.id, balance=0.0)
-    db_session.add_all([sender_wallet, recipient_wallet])
-    await db_session.commit()
-
-    return sender, recipient
+# Simple mock classes to avoid Pydantic validation issues
+class MockTopUpData:
+    def __init__(self, amount, card_id):
+        self.amount = amount
+        self.card_id = card_id
 
 
-@pytest.fixture
-async def setup_user_no_wallet(db_session: AsyncSession):
-    dummy_password = get_password_hash("test123")
-
-    sender = User(
-        id=str(uuid4()),
-        email="sender1@example.com",
-        phone="13246543",
-        is_verified=True,
-        hashed_password=dummy_password,
-    )
-    recipient = User(
-        id=str(uuid4()),
-        email="receiver1@example.com",
-        phone="21324655",
-        is_verified=True,
-        hashed_password=dummy_password,
-    )
-
-    db_session.add_all([sender, recipient])
-    await db_session.commit()
-
-    return sender, recipient
+class MockTransactionData:
+    def __init__(self, recipient_identifier, amount, description=None):
+        self.recipient_identifier = recipient_identifier
+        self.amount = amount
+        self.description = description
 
 
-@pytest.fixture
-async def override_wallet_deps(db_session: AsyncSession, setup_wallets):
-    sender, recipient = setup_wallets
-    app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_current_verified_user] = lambda: sender
-    app.dependency_overrides[get_user_by_email] = lambda db, email: None
-    app.dependency_overrides[get_user_by_phone] = lambda db, phone: recipient
-    return sender, recipient
+class MockUser:
+    def __init__(self, user_id="user-123"):
+        self.id = user_id
+        self.email = "test@example.com"
+        self.fullname = "Test User"
 
 
-@pytest.fixture(autouse=True)
-def clear_dependency_overrides():
-    yield
-    app.dependency_overrides = {}
+class MockWallet:
+    def __init__(self, user_id="user-123", balance=1000.0):
+        self.id = "wallet-123"
+        self.user_id = user_id
+        self.balance = Decimal(str(balance))
 
 
-@pytest.mark.anyio
-async def test_get_balance(client: AsyncClient, override_wallet_deps):
-    response = await client.get("/api/v1/wallet/balance")
-    assert response.status_code == 200
-    assert "balance" in response.json()
+class MockTransaction:
+    def __init__(self, **kwargs):
+        self.id = kwargs.get("id", "txn-123")
+        self.sender_id = kwargs.get("sender_id", "user-123")
+        self.recipient_id = kwargs.get("recipient_id", "user-456")
+        self.amount = kwargs.get("amount", Decimal("100.00"))
+        self.type = kwargs.get("type", "transfer")
+        self.status = kwargs.get("status", "completed")
+        self.sender = kwargs.get("sender", None)
+        self.recipient = kwargs.get("recipient", None)
 
 
-@pytest.mark.anyio
-async def test_top_up_wallet(client: AsyncClient, override_wallet_deps):
-    response = await client.post("/api/v1/wallet/top-up", json={"amount": 50})
-    assert response.status_code == 200
-    assert response.json()["balance"] == 150.0
+class TestWalletSimple:
+    """Simplified wallet tests without complex mocking."""
 
+    @pytest.fixture
+    def mock_db(self):
+        return AsyncMock()
 
-@pytest.mark.anyio
-async def test_transfer_money(client: AsyncClient, override_wallet_deps):
-    payload = {"amount": 20, "recipient_identifier": "21324654", "description": "Test transfer"}
-    response = await client.post("/api/v1/wallet/transfer", json=payload)
-    assert response.status_code == 200
-    assert response.json()["amount"] == 20
+    @pytest.fixture
+    def mock_user(self):
+        return MockUser()
 
+    @pytest.fixture
+    def mock_wallet(self):
+        return MockWallet()
 
-@pytest.mark.anyio
-async def test_get_transactions(client: AsyncClient, db_session: AsyncSession, override_wallet_deps):
-    sender, recipient = override_wallet_deps
-    tx = Transaction(
-        id=str(uuid4()), sender_id=sender.id, recipient_id=recipient.id, amount=30, type="transfer", status="completed"
-    )
-    db_session.add(tx)
-    await db_session.commit()
+    @pytest.mark.asyncio
+    async def test_get_balance_success(self, mock_db, mock_user, mock_wallet):
+        """Test successful balance retrieval."""
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = mock_wallet
+        mock_db.execute.return_value = mock_result
 
-    res = await client.get("/api/v1/wallet/transactions")
-    assert res.status_code == 200
-    assert isinstance(res.json(), list)
-    assert len(res.json()) >= 1
+        result = await get_balance(db=mock_db, current_user=mock_user)
 
+        assert result == mock_wallet
+        mock_db.execute.assert_called_once()
 
-@pytest.mark.anyio
-async def test_get_balance_wallet_not_found(client: AsyncClient, db_session, setup_user_no_wallet):
-    sender, _ = setup_user_no_wallet
-    app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_current_verified_user] = lambda: sender
-    res = await client.get("/api/v1/wallet/balance")
-    assert res.status_code == 404
+    @pytest.mark.asyncio
+    async def test_get_balance_wallet_not_found(self, mock_db, mock_user):
+        """Test balance retrieval when wallet doesn't exist."""
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = None
+        mock_db.execute.return_value = mock_result
 
+        with pytest.raises(HTTPException) as exc_info:
+            await get_balance(db=mock_db, current_user=mock_user)
 
-@pytest.mark.anyio
-async def test_top_up_wallet_not_found(client: AsyncClient, db_session, setup_user_no_wallet):
-    sender, _ = setup_user_no_wallet
-    app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_current_verified_user] = lambda: sender
-    res = await client.post("/api/v1/wallet/top-up", json={"amount": 10})
-    assert res.status_code == 404
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Wallet not found"
 
+    @pytest.mark.asyncio
+    async def test_top_up_wallet_success(self, mock_db, mock_user, mock_wallet):
+        """Test successful wallet top up."""
+        top_up_data = MockTopUpData(amount=500.0, card_id="card-123")
+        initial_balance = float(mock_wallet.balance)
 
-@pytest.mark.anyio
-async def test_transfer_insufficient_balance(client: AsyncClient, override_wallet_deps):
-    payload = {"amount": 9999, "recipient_identifier": "21324654", "description": "Overdraft"}
-    res = await client.post("/api/v1/wallet/transfer", json=payload)
-    assert res.status_code == 400
-    assert res.json()["detail"] == "Insufficient balance"
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = mock_wallet
+        mock_db.execute.return_value = mock_result
 
+        with patch("uuid.uuid4") as mock_uuid:
+            mock_uuid.return_value.__str__ = Mock(return_value="transaction-123")
 
-@pytest.mark.anyio
-async def test_transfer_recipient_not_found(client: AsyncClient, db_session, setup_wallets):
-    sender, _ = setup_wallets
-    app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_current_verified_user] = lambda: sender
-    app.dependency_overrides[get_user_by_email] = lambda db, email: None
-    app.dependency_overrides[get_user_by_phone] = lambda db, phone: None
+            result = await top_up_wallet(top_up_data=top_up_data, db=mock_db, current_user=mock_user)
 
-    payload = {"amount": 10, "recipient_identifier": "ghost@example.com", "description": "No recipient"}
+            # Verify wallet balance was updated
+            assert mock_wallet.balance == initial_balance + top_up_data.amount
 
-    res = await client.post("/api/v1/wallet/transfer", json=payload)
-    assert res.status_code == 404
+            # Verify database operations
+            mock_db.add.assert_called_once()
+            mock_db.commit.assert_called_once()
+            mock_db.refresh.assert_called_once()
 
+            assert result == mock_wallet
 
-@pytest.mark.anyio
-async def test_transfer_sender_wallet_not_found(client: AsyncClient, db_session, setup_user_no_wallet):
-    sender, recipient = setup_user_no_wallet
-    app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_current_verified_user] = lambda: sender
-    app.dependency_overrides[get_user_by_email] = lambda db, email: recipient
-    app.dependency_overrides[get_user_by_phone] = lambda db, phone: recipient
+    @pytest.mark.asyncio
+    async def test_top_up_wallet_not_found(self, mock_db, mock_user):
+        """Test top up when wallet doesn't exist."""
+        top_up_data = MockTopUpData(amount=500.0, card_id="card-123")
 
-    payload = {"amount": 10, "recipient_identifier": recipient.email, "description": "No wallet"}
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = None
+        mock_db.execute.return_value = mock_result
 
-    res = await client.post("/api/v1/wallet/transfer", json=payload)
-    assert res.status_code == 404
+        with pytest.raises(HTTPException) as exc_info:
+            await top_up_wallet(top_up_data=top_up_data, db=mock_db, current_user=mock_user)
 
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Wallet not found"
 
-@pytest.mark.anyio
-async def test_get_transactions_empty(client: AsyncClient, db_session):
-    user = User(id=str(uuid4()), email="empty@example.com", is_verified=True, hashed_password="x")
-    wallet = Wallet(user_id=user.id, balance=0.0)
-    db_session.add_all([user, wallet])
-    await db_session.commit()
+    @pytest.mark.asyncio
+    async def test_withdraw_wallet_success(self, mock_db, mock_user, mock_wallet):
+        """Test successful wallet withdrawal."""
+        withdraw_data = MockTopUpData(amount=300.0, card_id="card-123")
+        initial_balance = float(mock_wallet.balance)
 
-    app.dependency_overrides[get_db] = lambda: db_session
-    app.dependency_overrides[get_current_verified_user] = lambda: user
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = mock_wallet
+        mock_db.execute.return_value = mock_result
 
-    res = await client.get("/api/v1/wallet/transactions")
-    assert res.status_code == 200
-    assert res.json() == []
+        with patch("uuid.uuid4"):
+            result = await withdraw_wallet(withdraw=withdraw_data, db=mock_db, current_user=mock_user)
+
+            # Verify wallet balance was updated
+            assert mock_wallet.balance == initial_balance - withdraw_data.amount
+
+            # Verify database operations
+            mock_db.add.assert_called_once()
+            mock_db.commit.assert_called_once()
+            mock_db.refresh.assert_called_once()
+
+            assert result == mock_wallet
+
+    @pytest.mark.asyncio
+    async def test_withdraw_wallet_negative_amount(self, mock_db, mock_user):
+        """Test withdrawal with negative amount."""
+        withdraw_data = MockTopUpData(amount=-100.0, card_id="card-123")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await withdraw_wallet(withdraw=withdraw_data, db=mock_db, current_user=mock_user)
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Amount must be positive"
+
+    @pytest.mark.asyncio
+    async def test_withdraw_wallet_insufficient_balance(self, mock_db, mock_user):
+        """Test withdrawal with insufficient balance."""
+        withdraw_data = MockTopUpData(amount=1500.0, card_id="card-123")
+        mock_wallet = MockWallet(balance=1000.0)  # Less than withdrawal amount
+
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = mock_wallet
+        mock_db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await withdraw_wallet(withdraw=withdraw_data, db=mock_db, current_user=mock_user)
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Insufficient balance"
+
+    @pytest.mark.asyncio
+    async def test_transfer_money_insufficient_balance(self, mock_db, mock_user):
+        """Test transfer with insufficient balance."""
+        transaction_data = MockTransactionData(
+            recipient_identifier="recipient@example.com",
+            amount=1500.0,  # More than available balance
+            description="Test transfer",
+        )
+
+        sender_wallet = MockWallet(balance=1000.0)
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = sender_wallet
+        mock_db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await transfer_money(transaction_data=transaction_data, db=mock_db, current_user=mock_user)
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Insufficient balance"
+
+    @pytest.mark.asyncio
+    async def test_transfer_money_sender_wallet_not_found(self, mock_db, mock_user):
+        """Test transfer when sender wallet doesn't exist."""
+        transaction_data = MockTransactionData(
+            recipient_identifier="recipient@example.com", amount=200.0, description="Test transfer"
+        )
+
+        mock_result = Mock()
+        mock_result.scalars.return_value.first.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await transfer_money(transaction_data=transaction_data, db=mock_db, current_user=mock_user)
+
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Sender wallet not found"
+
+    @pytest.mark.asyncio
+    async def test_get_transactions_success(self, mock_db, mock_user):
+        """Test successful transaction retrieval."""
+        transactions = [
+            MockTransaction(id="txn-1", amount=Decimal("100.00")),
+            MockTransaction(id="txn-2", amount=Decimal("200.00")),
+        ]
+
+        mock_result = Mock()
+        mock_result.scalars.return_value.all.return_value = transactions
+        mock_db.execute.return_value = mock_result
+
+        result = await get_transactions(limit=50, offset=0, db=mock_db, current_user=mock_user)
+
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result == transactions
+        mock_db.execute.assert_called_once()

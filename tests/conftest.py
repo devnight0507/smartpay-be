@@ -1,16 +1,11 @@
-"""
-Test fixtures.
-"""
-
-import asyncio
 import os
-from typing import AsyncGenerator, Generator
+import time
+from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
 import asyncpg
-import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -18,37 +13,27 @@ from app.api.dependencies import get_db_session
 from app.db.session import Base
 from app.main import app
 
-# Test database URL
 TEST_DATABASE_NAME = "smartpay_test"
-
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", f"postgresql+asyncpg://postgres:postgres@smartpay-postgres-dev:5432/{TEST_DATABASE_NAME}"
 )
 
-# Disable tracing for tests
 os.environ["ENABLE_TRACING"] = "false"
-
-# Create async engine for testing
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    echo=False,
-)
-
-# Create async session factory
-test_async_session = sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
-)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def prepare_test_db() -> AsyncGenerator[None, None]:
-    """
-    Create the test database before tests run, and drop it after tests.
-    """
+async def prepare_test_db():
     admin_dsn = os.getenv("TEST_ADMIN_DSN", "postgresql://postgres:postgres@smartpay-postgres-dev:5432/postgres")
+    for i in range(10):
+        try:
+            conn = await asyncpg.connect(dsn=admin_dsn)
+            await conn.close()
+            break
+        except Exception as e:
+            print(f"Waiting for Postgres... ({i+1}/10): {e}")
+            time.sleep(2)
+    else:
+        raise RuntimeError("Could not connect to Postgres for test DB setup")
 
     conn = await asyncpg.connect(dsn=admin_dsn)
     try:
@@ -57,9 +42,7 @@ async def prepare_test_db() -> AsyncGenerator[None, None]:
         print(f"✅ Created test database: {TEST_DATABASE_NAME}")
     finally:
         await conn.close()
-
     yield
-
     conn = await asyncpg.connect(dsn=admin_dsn)
     try:
         await conn.execute(f'DROP DATABASE IF EXISTS "{TEST_DATABASE_NAME}" WITH (FORCE);')
@@ -68,41 +51,29 @@ async def prepare_test_db() -> AsyncGenerator[None, None]:
         await conn.close()
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """
-    Create an instance of the default event loop for each test case.
-    """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Create a clean database session for a test.
-
-    Yields a clean session for test, and cleans up after.
-    """
+async def db_session(prepare_test_db) -> AsyncGenerator[AsyncSession, None]:
+    # Create engine and sessionmaker inside the fixture
+    test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    test_async_session = sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+    )
     # Create tables
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    # Create session
     async with test_async_session() as session:
         yield session
-
-    # Clean up - drop all tables
+    # Drop all tables
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    await test_engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def mock_redis() -> AsyncGenerator[AsyncMock, None]:
-    """
-    Create a mock Redis client for testing.
-    """
     mock_client = AsyncMock()
     mock_client.ping.return_value = True
     mock_client.get.return_value = "mock_value"
@@ -116,9 +87,6 @@ async def mock_redis() -> AsyncGenerator[AsyncMock, None]:
 
 @pytest_asyncio.fixture(scope="function")
 async def mock_kafka() -> AsyncGenerator[AsyncMock, None]:
-    """
-    Create a mock Kafka producer for testing.
-    """
     mock_producer = AsyncMock()
     mock_producer.connected.return_value = True
     mock_producer.start.return_value = None
@@ -130,19 +98,11 @@ async def mock_kafka() -> AsyncGenerator[AsyncMock, None]:
 async def client(
     db_session: AsyncSession, mock_redis: AsyncMock, mock_kafka: AsyncMock
 ) -> AsyncGenerator[AsyncClient, None]:
-    """
-    Create a test client for the FastAPI application.
-    """
-
     async def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
+        yield db_session
 
     app.dependency_overrides[get_db_session] = override_get_db
-
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-
     app.dependency_overrides = {}

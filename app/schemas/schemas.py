@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, root_validator, validator
@@ -59,7 +59,7 @@ class UserInDBBase(UserBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    verify_code: Optional[str] = None
+    # verify_code: Optional[str] = None
 
     class Config:
         """Pydantic config."""
@@ -77,7 +77,13 @@ class Token(BaseModel):
     """Token schema."""
 
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class AccessTokenOnly(BaseModel):
+    access_token: str
+    token_type: str
 
 
 class TokenPayload(BaseModel):
@@ -86,11 +92,82 @@ class TokenPayload(BaseModel):
     sub: Optional[str] = None
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class NotifSettingUpdate(BaseModel):
+    notif_setting: str = Field(
+        ...,
+        description="Notification setting preference",
+    )
+
+
+class NotifSettingResponse(BaseModel):
+    notif_setting: str = Field(description="Current notification setting")
+
+    class Config:
+        from_attributes = True
+
+
+class NotifiSettingUpdateResponse(BaseModel):
+    message: str = Field(description="Success message")
+    notif_setting: str = Field(description="Updated notification setting")
+
+    class Config:
+        from_attributes = True
+
+
 # Wallet schemas
 class WalletBase(BaseModel):
     """Base wallet schema."""
 
     balance: float = 0.0
+
+
+class SimpleUser(BaseModel):
+    """Lightweight user schema for transaction context."""
+
+    id: UUID
+    fullname: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+
+class SimplePaymentCard(BaseModel):
+    """Minimal card data for transaction reference."""
+
+    id: str
+    masked_card_number: str
+    card_type: str
+    card_color: str
+
+    class Config:
+        orm_mode = True
+
+
+class TransactionWithUsers(BaseModel):
+    """Transaction schema with sender and recipient data."""
+
+    id: UUID
+    sender_id: Optional[UUID] = None
+    recipient_id: Optional[UUID] = None
+    amount: float
+    description: Optional[str] = None
+    type: str  # "transfer", "deposit", "withdrawal"
+    card_id: Optional[UUID] = None
+    status: str = "completed"
+    created_at: datetime
+
+    sender: Optional[SimpleUser] = None
+    recipient: Optional[SimpleUser] = None
+    card: Optional[SimplePaymentCard] = None
+
+    class Config:
+        orm_mode = True
 
 
 class WalletCreate(WalletBase):
@@ -151,14 +228,17 @@ class TopUpCreate(BaseModel):
     """Schema for deposit/top-up creation."""
 
     amount: float = Field(..., gt=0)
+    card_id: UUID
 
 
 class TransactionInDBBase(TransactionBase):
     """Base schema for transaction in DB."""
 
     id: UUID
-    sender_id: Optional[str] = None
-    recipient_id: Optional[str] = None
+    sender_id: Optional[UUID] = None
+    recipient_id: Optional[UUID] = None
+    type: str  # "deposit", "transtfer", "withdraw", "receive"
+    card_id: Optional[UUID] = None
     status: str = "completed"  # "pending", "completed", "failed"
     created_at: datetime
 
@@ -322,3 +402,135 @@ class MessageResponse(BaseModel):
     """Schema for simple message responses."""
 
     message: str
+
+
+class UserActiveResponseUpdate(BaseModel):
+    """
+    Schema for user activation/deactivation response
+    Used when admin toggles user active status
+    """
+
+    success: bool
+    message: Optional[str] = None
+    is_active: Optional[bool] = None
+
+    class Config:
+        # For Pydantic v2 (use this)
+        json_schema_extra = {"example": {"success": True, "message": "User activated successfully", "is_active": True}}
+
+
+class AdminPasswordUpdateRequest(BaseModel):
+    new_password: str = Field(..., min_length=8)
+
+
+class MonthlyStat(BaseModel):
+    month: str
+    monthNumber: int
+    averageAmount: float
+    totalTransactions: int
+    totalVolume: float
+    trend: str  # "up", "down", "stable"
+    changePercentage: float
+
+    class Config:
+        from_attributes = True
+
+
+class OverallStats(BaseModel):
+    totalTransactions: int
+    totalVolume: float
+    overallAverage: float
+    monthOverMonthGrowth: float
+
+    class Config:
+        from_attributes = True
+
+
+class AdminTransactionSummary(BaseModel):
+    overallStats: OverallStats
+    monthlyStats: List[MonthlyStat]
+    lastUpdated: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MonthlyBalanceStat(BaseModel):
+    month: str
+    monthNumber: int
+    averageBalance: float
+    totalBalance: float
+    userCount: int
+    avgTrend: str
+    totalTrend: str
+    userTrend: str
+    avgChangePercentage: float
+    totalChangePercentage: float
+    userChangePercentage: float
+    newUsers: int
+
+    class Config:
+        from_attributes = True
+
+
+class OverallBalanceStats(BaseModel):
+    totalUsers: int
+    currentTotalBalance: float
+    currentAverageBalance: float
+    avgMonthOverMonthGrowth: float
+    totalMonthOverMonthGrowth: float
+    userMonthOverMonthGrowth: float
+    totalNewUsersThisYear: int
+
+    class Config:
+        from_attributes = True
+
+
+class BalanceSummaryResponse(BaseModel):
+    monthlyStats: List[MonthlyBalanceStat]
+    overallStats: OverallBalanceStats
+    lastUpdated: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserMonthlyStats(BaseModel):
+    name: str
+    received: float
+    sent: float
+    revenue: float
+
+
+# Add these schemas to your schemas.py file
+
+
+# =====================================
+# Forgot Password Schemas
+# =====================================
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Step 1: Request password reset via email."""
+
+    email: EmailStr
+
+    class Config:
+        json_schema_extra = {"example": {"email": "user@example.com"}}
+
+
+class ForgotPasswordVerifyCode(BaseModel):
+    email: EmailStr
+    verify_code: str = Field(..., min_length=4, max_length=8)
+
+
+class ForgotPasswordReset(BaseModel):
+    token: str
+    newpassword: str = Field(..., min_length=8)
+
+
+class ForgotPasswordResponse(BaseModel):
+    success: bool
+    message: str
+    token: Optional[str] = None
+    # verified_code: Optional[str] = None
