@@ -24,7 +24,7 @@ async def send_verification_code(to_email: str, code: str) -> dict:
             "subject": "Your SmartPay Verification Code",
             "html": f"<p>Your verification code is: <strong>{code}</strong></p>",
         }
-        return resend.Emails.send(params).__dict__  # type: ignore[arg-type]
+        return resend.Emails.send(params).__dict__  # type: ignore
 
     else:
         msg = EmailMessage()

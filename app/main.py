@@ -101,7 +101,15 @@ def create_application() -> FastAPI:
     cors_origins = ["*"] if settings.CORS_ORIGINS_STR == "*" else settings.CORS_ORIGINS_STR.split(",")
 
     cors_origins.extend(
-        ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8080", "http://127.0.0.1:8080"]
+        [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5000",
+            "http://127.0.0.1:5000",
+            "http://146.19.215.133:5000",
+            "https://app.smartpaymentnet.com",
+            "http://app.smartpaymentnet.com",
+        ]
     )
     # Add CORS middleware
     application.add_middleware(
