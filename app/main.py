@@ -80,7 +80,6 @@ def create_application() -> FastAPI:
             {"name": "Wallet", "description": "Wallet check endpoints"},
             {"name": "Payment Card", "description": "Payment card endpoints"},
             {"name": "Errors", "description": "Error demonstration endpoints with i18n support"},
-            {"name": "WebSockets", "description": "WebSocket connection and notification endpoints"},
         ],
         contact={
             "name": "API Support",
