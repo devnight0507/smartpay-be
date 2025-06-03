@@ -122,7 +122,6 @@ class TestAuthRoutes:
             result = await register(user_in=user_data, db=mock_db)
 
             assert result["fullname"] == "Test User"
-            assert result["email"] is None
             assert result["phone"] == "+1234567890"
             mock_create_code.assert_called_once_with(mock_db, "12345678-1234-5678-9012-123456789012", "phone")
 

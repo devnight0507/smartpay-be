@@ -13,8 +13,8 @@ def test_user_base_email_and_phone_validation():
     assert user1.email == "test@example.com"
 
     # Valid: only phone
-    user2 = schemas.UserBase(fullname="Full Name", phone="123456789")
-    assert user2.phone == "123456789"
+    user2 = schemas.UserBase(fullname="Full Name", phone="+1234567890")
+    assert user2.phone == "+1234567890"
 
     # Invalid: neither email nor phone
     with pytest.raises(ValidationError) as exc:
