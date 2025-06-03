@@ -9,11 +9,11 @@ from app.schemas import schemas
 
 def test_user_base_email_and_phone_validation():
     # Valid: only email
-    user1 = schemas.UserBase(email="test@example.com")
+    user1 = schemas.UserBase(fullname="Full Name", email="test@example.com")
     assert user1.email == "test@example.com"
 
     # Valid: only phone
-    user2 = schemas.UserBase(phone="123456789")
+    user2 = schemas.UserBase(fullname="Full Name", phone="123456789")
     assert user2.phone == "123456789"
 
     # Invalid: neither email nor phone
@@ -81,6 +81,7 @@ def test_payment_card_update_strip_name():
 
 def test_user_in_db_base_orm_mode():
     user = schemas.UserInDBBase(
+        fullname="Test User",
         id=uuid4(),
         email="test@example.com",
         created_at=datetime.now(),
