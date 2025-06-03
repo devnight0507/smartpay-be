@@ -116,6 +116,11 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS_STR: str = "*"
 
+    # resend mailer
+    MAIL_MODE: str = "dev"
+    RESEND_API_KEY: str = "your_resend_api_key"
+    RESEND_DOMAIN: str = "yourdomain.com"
+
 
 # Create the singleton instance (override sensitive values here for local dev)
 settings = Settings(

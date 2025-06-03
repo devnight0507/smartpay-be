@@ -57,15 +57,13 @@ def create_application() -> FastAPI:
     """
     configure_logging()
 
-    print("URI", settings.DATABASE_URI)
-
     application = FastAPI(
         title=settings.PROJECT_NAME,
         description=settings.PROJECT_DESCRIPTION,
         version=settings.VERSION,
-        docs_url="/api/docs" if not settings.ENVIRONMENT == "production" else None,
-        redoc_url="/api/redoc" if not settings.ENVIRONMENT == "production" else None,
-        openapi_url="/api/openapi.json" if not settings.ENVIRONMENT == "production" else None,
+        docs_url="/api/docs",  # if not settings.ENVIRONMENT == "production" else None,
+        redoc_url="/api/redoc",  # if not settings.ENVIRONMENT == "production" else None,
+        openapi_url="/api/openapi.json",  # if not settings.ENVIRONMENT == "production" else None,
         lifespan=lifespan,
         swagger_ui_parameters={
             "deepLinking": True,

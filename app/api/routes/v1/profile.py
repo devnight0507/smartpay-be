@@ -163,9 +163,6 @@ async def create_verification_code(db: AsyncSession, user_id: str, verification_
     await db.commit()
     await db.refresh(db_verification_code)
 
-    # In a real application, you would send the code via email or SMS here
-    print(f"Verification code for user {user_id}: {code}")
-
     return db_verification_code
 
 

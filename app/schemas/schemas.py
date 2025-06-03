@@ -9,9 +9,9 @@ from pydantic import BaseModel, EmailStr, Field, root_validator, validator
 class UserBase(BaseModel):
     """Base user schema."""
 
-    fullname: Optional[str] = None
+    fullname: str = Field(..., min_length=1, max_length=100)
     email: Optional[EmailStr] = None
-    phone: Optional[str] = None
+    phone: Optional[str] = Field(None, min_length=10, max_length=15, pattern=r"^\+?[1-9]\d{1,14}$")
     is_active: bool = True
     is_admin: bool = False
     is_verified: bool = False
@@ -534,3 +534,11 @@ class ForgotPasswordResponse(BaseModel):
     message: str
     token: Optional[str] = None
     # verified_code: Optional[str] = None
+
+
+class CardValidation(BaseModel):
+    """Schema for card validation response."""
+
+    valid: bool
+    card_type: str
+    length: int

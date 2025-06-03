@@ -152,7 +152,6 @@ async def transfer_money(
     db.add(transaction)
     await db.commit()
     await db.refresh(transaction)
-    print("DEBUG", transaction_id)
 
     # Notify sender
     await notify_user(

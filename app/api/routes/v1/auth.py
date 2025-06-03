@@ -18,6 +18,7 @@ from app.api.dependencies import (
     check_rate_limit,
     get_current_active_user,
 )
+from app.api.utils import is_valid_email_dns
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -48,8 +49,6 @@ raw_key = os.getenv("ENCRYPTION_KEY")
 # Generate a valid Fernet key if missing or invalid
 if not raw_key or len(raw_key.encode()) != 44:
     raw_key = Fernet.generate_key().decode()
-    # Optionally: print this so you can save it
-    print(f"⚠️ Generated a new ENCRYPTION_KEY: {raw_key}")
 
 assert raw_key is not None
 ENCRYPTION_KEY = raw_key.encode()
@@ -82,6 +81,11 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Either email or phone must be provided",
+        )
+    if email is None or is_valid_email_dns(email) is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email format",
         )
 
     # Check if user with email already exists (only if email is provided)
@@ -511,7 +515,6 @@ async def verify_password_reset_code(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-
     # ============ UTILITY FUNCTIONS INSIDE THIS FUNCTION ============
     def encrypt_email(email: str) -> str:
         """Encrypt email address"""
