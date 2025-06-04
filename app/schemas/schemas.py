@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, root_validator, validator
@@ -10,7 +10,7 @@ class UserBase(BaseModel):
     """Base user schema."""
 
     fullname: str = Field(..., min_length=1, max_length=100)
-    email: Optional[EmailStr] = None
+    email: Union[EmailStr, None, str] = None
     phone: Optional[str] = Field(None, min_length=10, max_length=15, pattern=r"^\+?[1-9]\d{1,14}$")
     is_active: bool = True
     is_admin: bool = False
