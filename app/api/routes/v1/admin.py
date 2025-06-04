@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_admin
+from app.api.responses import default_error_responses
 from app.core.security import get_password_hash
 from app.db.models.models import Transaction, User, Wallet
 from app.db.session import get_db
@@ -48,9 +49,10 @@ async def get_users(
 
 
 @router.patch(
-    "/admin/{user_id}/activate",
+    "/users/{user_id}/activate",
     response_model=UserActiveResponseUpdate,
     summary="Admin can activate/deactivate specific users",
+    responses=default_error_responses,
 )
 async def toggle_user_active(
     user_id: UUID,
@@ -94,7 +96,11 @@ async def toggle_user_active(
         )
 
 
-@router.put("/admin/{user_id}/password", summary="Admin updates user's password")
+@router.put(
+    "/users/{user_id}/password",
+    summary="Admin updates user's password",
+    responses=default_error_responses,
+)
 async def update_user_password(
     user_id: UUID,
     payload: AdminPasswordUpdateRequest,

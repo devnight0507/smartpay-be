@@ -131,6 +131,22 @@ class ValidationErrorModel(ErrorResponseModel):
 
     code: ResponseCode = Field(ResponseCode.VALIDATION_ERROR, description="Validation error code")
     details: List[ErrorDetail] = Field(..., description="Validation error details")
+    message: str = Field(ResponseMessage("ValidationError").message, description="Validation error message")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "code": "validation_error",
+                "message": "One or more fields failed validation.",
+                "details": [
+                    {
+                        "loc": ["body", "email"],
+                        "msg": "value is not a valid email address",
+                        "type": "value_error.email",
+                    }
+                ],
+            }
+        }
 
 
 class NotFoundModel(ErrorResponseModel):
@@ -213,3 +229,28 @@ class Tags:
 
     HEALTH = "Health"
     WEBSOCKETS = "WebSockets"
+
+
+# Define common response messages for use in API responses
+default_error_responses: dict[int | str, dict[str, Any]] | None = {
+    HTTP_400_BAD_REQUEST: {
+        "model": BadRequestModel,
+        "description": "Bad Request – Invalid input or logic error",
+    },
+    HTTP_401_UNAUTHORIZED: {
+        "model": InvalidAuthCredForbiddenModel,
+        "description": "Unauthorized – Invalid or missing authentication",
+    },
+    HTTP_403_FORBIDDEN: {
+        "model": JWTMalformedForbiddenModel,
+        "description": "Forbidden – Auth token malformed or access denied",
+    },
+    HTTP_422_UNPROCESSABLE_ENTITY: {
+        "model": ValidationErrorModel,
+        "description": "Validation Error – Input validation failed",
+    },
+    HTTP_500_INTERNAL_SERVER_ERROR: {
+        "model": InternalErrorModel,
+        "description": "Internal Error – Unexpected server failure",
+    },
+}

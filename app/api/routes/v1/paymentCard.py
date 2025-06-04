@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.api.dependencies import get_current_active_user
+from app.api.responses import default_error_responses
 from app.api.utils import is_valid_card
 from app.db.models.models import PaymentCard, User
 from app.db.session import get_db
@@ -50,7 +51,7 @@ async def get_all_cards(
     ]
 
 
-@router.post("/", response_model=dict)
+@router.post("/", response_model=dict, responses=default_error_responses)
 async def add_new_card(
     card_in: PaymentCardCreate,
     db: AsyncSession = Depends(get_db),

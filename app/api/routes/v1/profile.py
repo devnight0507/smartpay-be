@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.api.dependencies import get_current_active_user, get_current_verified_user
+from app.api.responses import default_error_responses
 from app.core.security import get_password_hash, verify_password
 from app.db.models.models import Transaction, User, VerificationCode
 from app.db.session import get_db
@@ -38,6 +39,7 @@ class PasswordUpdateRequest(BaseModel):
 @router.put(
     "/phone",
     summary="Update Phone Number",
+    responses=default_error_responses,
 )
 async def update_phone(
     phone_data: PhoneUpdateRequest,
@@ -103,6 +105,7 @@ async def update_phone(
 @router.put(
     "/password",
     summary="Update Password",
+    responses=default_error_responses,
 )
 async def update_password(
     password_data: PasswordUpdateRequest,
@@ -206,10 +209,28 @@ async def get_monthly_transaction_summary(
         select(
             extract("month", Transaction.created_at).label("month"),
             func.coalesce(
-                func.sum(case((Transaction.recipient_id == str(current_user.id), Transaction.amount), else_=0)), 0
+                func.sum(
+                    case(
+                        (
+                            (Transaction.recipient_id == str(current_user.id)) & (Transaction.type == "transfer"),
+                            Transaction.amount,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
             ).label("received"),
             func.coalesce(
-                func.sum(case((Transaction.sender_id == str(current_user.id), Transaction.amount), else_=0)), 0
+                func.sum(
+                    case(
+                        (
+                            (Transaction.sender_id == str(current_user.id)) & (Transaction.type == "transfer"),
+                            Transaction.amount,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
             ).label("sent"),
         )
         .where(

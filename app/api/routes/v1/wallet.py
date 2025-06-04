@@ -12,6 +12,7 @@ from app.api.dependencies import (
     get_user_by_email,
     get_user_by_phone,
 )
+from app.api.responses import default_error_responses
 from app.db.models.models import Transaction, User, Wallet
 from app.db.session import get_db
 from app.schemas.schemas import TopUpCreate
@@ -42,7 +43,7 @@ async def get_balance(
     return wallet
 
 
-@router.post("/deposit", response_model=WalletSchema)
+@router.post("/deposit", response_model=WalletSchema, responses=default_error_responses)
 async def top_up_wallet(
     top_up_data: TopUpCreate,
     db: AsyncSession = Depends(get_db),
@@ -80,7 +81,7 @@ async def top_up_wallet(
     return wallet
 
 
-@router.post("/transfer", response_model=TransactionSchema)
+@router.post("/transfer", response_model=TransactionSchema, responses=default_error_responses)
 async def transfer_money(
     transaction_data: TransactionCreate,
     db: AsyncSession = Depends(get_db),
@@ -183,7 +184,7 @@ async def transfer_money(
     return transaction
 
 
-@router.post("/withdraw", response_model=WalletSchema, summary="Withdraw Money")
+@router.post("/withdraw", response_model=WalletSchema, summary="Withdraw Money", responses=default_error_responses)
 async def withdraw_wallet(
     withdraw: TopUpCreate,
     db: AsyncSession = Depends(get_db),

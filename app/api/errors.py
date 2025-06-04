@@ -46,13 +46,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         flat_errors = [flatten_error(err) for err in exc.errors()]
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "Invalid request parameters",
-                    "details": {"errors": " | ".join(flat_errors)},
-                }
-            },
+            content={"details": " | ".join(flat_errors)},
         )
 
     @app.exception_handler(IntegrityError)

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.api.dependencies import get_current_verified_user
+from app.api.responses import default_error_responses
 from app.db.models.models import Notification, User
 from app.db.session import get_db
 
@@ -38,7 +39,7 @@ async def get_my_notifications(
     ]
 
 
-@router.post("/{notification_id}/read", summary="Mark notification as read")
+@router.post("/{notification_id}/read", summary="Mark notification as read", responses=default_error_responses)
 async def mark_notification_read(
     notification_id: str = Path(..., description="Notification UUID"),
     db: AsyncSession = Depends(get_db),
@@ -82,7 +83,7 @@ async def mark_all_notifications_read(
     return {"message": f"{len(notifications)} notification(s) marked as read"}
 
 
-@router.delete("/{notification_id}", summary="Delete a notification by ID")
+@router.delete("/{notification_id}", summary="Delete a notification by ID", responses=default_error_responses)
 async def delete_notification(
     notification_id: str = Path(..., description="Notification UUID"),
     db: AsyncSession = Depends(get_db),

@@ -18,6 +18,7 @@ from app.api.dependencies import (
     check_rate_limit,
     get_current_active_user,
 )
+from app.api.responses import default_error_responses
 from app.api.utils import is_valid_email_dns
 from app.core.config import settings
 from app.core.security import (
@@ -64,6 +65,7 @@ router = APIRouter()
     "/register",
     response_model=UserSchema,
     summary="Register a new user.",
+    responses=default_error_responses,
 )
 async def register(
     user_in: UserCreate,
@@ -158,6 +160,7 @@ async def register(
     "/login",
     response_model=Token,
     summary="Login and get access token.",
+    responses=default_error_responses,
 )
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -261,7 +264,11 @@ async def update_notif_setting(
     }
 
 
-@router.post("/verify/{verification_type}", response_model=VerificationResponse)
+@router.post(
+    "/verify/{verification_type}",
+    response_model=VerificationResponse,
+    responses=default_error_responses,
+)
 async def verify_user(
     verification_type: str,
     verification_data: VerificationRequest,
@@ -328,7 +335,11 @@ async def verify_user(
     }
 
 
-@router.post("/resend-verification/{verification_type}", response_model=dict)
+@router.post(
+    "/resend-verification/{verification_type}",
+    response_model=dict,
+    responses=default_error_responses,
+)
 async def resend_verification(
     verification_type: str,
     db: AsyncSession = Depends(get_db),
@@ -411,6 +422,7 @@ async def create_verification_code(db: AsyncSession, user_id: str, verification_
 @router.get(
     "/{username}",
     summary="Get User by user email or phone",
+    responses=default_error_responses,
 )
 async def get_user(
     username: str,
@@ -460,6 +472,7 @@ async def get_user(
     "/forgot-password/send-code",
     response_model=ForgotPasswordResponse,
     summary="Step 1: Send password reset verification code",
+    responses=default_error_responses,
 )
 async def send_password_reset_code(
     request_data: ForgotPasswordRequest,
@@ -510,6 +523,7 @@ async def send_password_reset_code(
     "/forgot-password/verify-code",
     response_model=ForgotPasswordResponse,
     summary="Step 2: Verify password reset code and get token",
+    responses=default_error_responses,
 )
 async def verify_password_reset_code(
     verify_data: ForgotPasswordVerifyCode,

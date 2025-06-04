@@ -8,7 +8,7 @@
 - **WebSockets** - Real-time bi-directional communication with connection management
 - **Structured Logging** - Configurable JSON logging with context propagation using Loguru
 - **Docker Multi-stage Builds** - Optimized container images for deployment
-- **GitHub Actions CI/CD** - Automated testing, building, and deployment pipeline
+- **GitHub Actions CI/CD** - Automated testing, deployment pipeline
 - **Comprehensive Testing** - Pytest setup with fixtures for async testing
 - **Dependency Injection** - Clean, testable dependency management
 
@@ -19,7 +19,6 @@
 - Python 3.11+
 - Poetry for dependency management
 - Docker and Docker Compose for local development
-- Kubernetes for deployment (optional)
 
 ### Installation
 
@@ -64,7 +63,6 @@ The following services are available in the development environment:
 
 Login credentials for services:
 
-- **Grafana**: admin / admin
 - **PgAdmin**: admin@example.com / admin
 
 ### Useful Development Commands
@@ -205,7 +203,7 @@ async def get_open_job(...):
 
 ### Standardized Response Models
 
-The template includes a comprehensive set of standardized response models in `app/api/responses.py` that you can use to ensure consistent API documentation and responses:
+The repo includes a comprehensive set of standardized response models in `app/api/responses.py` that you can use to ensure consistent API documentation and responses:
 
 - `ResponseMessage` for generating consistent response messages
 - Standard error models for common error cases
@@ -223,11 +221,13 @@ The application is configured using environment variables. All settings are defi
 
 | Variable                  | Description                                         | Default               |
 | ------------------------- | --------------------------------------------------- | --------------------- |
-| `ENVIRONMENT`             | Environment name (development, staging, production) | `development`         |
+| `ENVIRONMENT`             | Environment name (development, production)          | `development`         |
 | `DEBUG`                   | Enable debug mode                                   | `True` in development |
 | `SECRET_KEY`              | Secret key for security                             | Required              |
 | `POSTGRES_*`              | Database connection parameters                      | Required              |
 | `LOG_LEVEL`               | Minimum log level                                   | `INFO`                |
+| `RESEND_*`                | Resend mailer parameters                            | `INFO`                |
+| `TEST_*`                  | DB connect parameters                       | Required              |
 
 ## Database Migrations
 
@@ -235,13 +235,13 @@ Database migrations are managed with Alembic:
 
 ```bash
 # Create a new migration
-alembic revision --autogenerate -m "description"
+make migrations M="description"
 
 # Run migrations
-alembic upgrade head
+make migrate
 
 # Rollback one version
-alembic downgrade -1
+make migrate-down
 ```
 
 ## WebSockets
@@ -264,15 +264,6 @@ async with websocket_connect(ws_url) as websocket:
         print(f"Received: {data}")
 ```
 
-Send notifications to WebSocket clients:
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/ws/broadcast" \
-     -H "Authorization: Bearer <token>" \
-     -H "Content-Type: application/json" \
-     -d '{"message": "Hello WebSocket clients", "topic": "notifications"}'
-```
-
 ### Logging
 
 Structured logging is configured using Loguru with JSON format by default:
@@ -289,16 +280,11 @@ The template includes a complete test suite setup with pytest:
 
 ```bash
 # Run all tests
-pytest
+make test
 
 # Run with coverage report
-pytest --cov=app --cov-report=term-missing
+make coverage
 
-# Run specific test file
-pytest tests/api/test_items.py
-
-# Run tests in parallel
-pytest -xvs -n auto
 ```
 
 ## Docker
@@ -317,12 +303,13 @@ docker run -p 8000:8000 --env-file .env smartpay-be:latest
 
 ## CI/CD
 
-The template includes a GitHub Actions workflow for CI/CD:
+The  includes a GitHub Actions workflow for CI/CD:
 
 ### GitHub Actions
 
 - Linting and type checking
 - Running tests with coverage
+- DB migration and Deployment into VPS on tag
 
 ## Troubleshooting
 
@@ -337,8 +324,3 @@ The template includes a GitHub Actions workflow for CI/CD:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details
-
-## Release Deployment Test
-```
-002
-```

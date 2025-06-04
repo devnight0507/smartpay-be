@@ -104,8 +104,8 @@ def create_application() -> FastAPI:
             "http://localhost:5000",
             "http://127.0.0.1:5000",
             "http://146.19.215.133:5000",
-            "https://app.smartpaymentnet.com",
-            "http://app.smartpaymentnet.com",
+            "https://smartpay.lavendarsolution.com",
+            "http://smartpay.lavendarsolution.com",
         ]
     )
     # Add CORS middleware
