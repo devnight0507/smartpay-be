@@ -18,13 +18,13 @@ def test_user_base_email_and_phone_validation():
 
     # Invalid: neither email nor phone
     with pytest.raises(ValidationError) as exc:
-        schemas.UserBase(email=None, phone=None)
+        schemas.UserBase(fullname="Full Name", email=None, phone=None)
 
     assert "Either email or phone must be provided" in str(exc.value)
 
     # Empty string test (normalized to None, then fails)
     with pytest.raises(ValidationError):
-        schemas.UserBase(email="", phone="")
+        schemas.UserBase(fullname="John", email="", phone="")
 
 
 def test_user_create_password_min_length():

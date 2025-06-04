@@ -94,9 +94,7 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_register_with_phone_success(self, mock_db):
-        user_data = UserCreate(
-            fullname="Test User", email="test@example.com", phone="+1234567890", password="password123"
-        )
+        user_data = UserCreate(fullname="Test User", email=None, phone="+1234567890", password="password123")
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.first.return_value = None
