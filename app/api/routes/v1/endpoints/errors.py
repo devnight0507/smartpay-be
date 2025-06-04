@@ -17,10 +17,7 @@ from app.api.responses import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_500_INTERNAL_SERVER_ERROR,
-    AgentNotExistsForbiddenModel,
     ErrorResponseModel,
-    InternalErrorModel,
-    NoContentsFoundModel,
     ResponseMessage,
 )
 from app.api.utils import create_response
@@ -189,9 +186,9 @@ async def raise_exception(
     description="Returns a formatted error response with a translated message based on the Accept-Language header",
     responses={
         HTTP_400_BAD_REQUEST: {"model": ErrorResponseModel},
-        HTTP_403_FORBIDDEN: {"model": AgentNotExistsForbiddenModel},
-        HTTP_404_NOT_FOUND: {"model": NoContentsFoundModel},
-        HTTP_500_INTERNAL_SERVER_ERROR: {"model": InternalErrorModel},
+        HTTP_403_FORBIDDEN: {"model": ErrorResponseModel},
+        HTTP_404_NOT_FOUND: {"model": ErrorResponseModel},
+        HTTP_500_INTERNAL_SERVER_ERROR: {"model": ErrorResponseModel},
     },
     tags=["Errors"],
     response_model=None,  # Disable response model generation
@@ -230,7 +227,7 @@ async def get_error_response(
             message_key="RecordNotFound",
             message_placeholders={"record": record_type},
             status_code=HTTP_404_NOT_FOUND,
-            response_model=NoContentsFoundModel,
+            response_model=ErrorResponseModel,  # type: ignore
         )
     elif error_type == "no_contents":
         # Use create_response utility
@@ -238,27 +235,27 @@ async def get_error_response(
             message_key="NoContentsFound",
             message_placeholders={"content": f"{record_type}s"},
             status_code=HTTP_404_NOT_FOUND,
-            response_model=NoContentsFoundModel,
+            response_model=ErrorResponseModel,  # type: ignore
         )
     elif error_type == "forbidden":
         # Use create_response utility
         return create_response(
             message_key="UnauthorizedAccess",
             status_code=HTTP_403_FORBIDDEN,
-            response_model=AgentNotExistsForbiddenModel,
+            response_model=ErrorResponseModel,  # type: ignore
         )
     elif error_type == "internal":
         # Use create_response utility
         return create_response(
             message_key="InternalError",
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            response_model=InternalErrorModel,
+            response_model=ErrorResponseModel,  # type: ignore
         )
     else:
         # Create a generic error response
         return create_response(
             message_key="ValidationError",
             status_code=HTTP_400_BAD_REQUEST,
-            response_model=ErrorResponseModel,
+            response_model=ErrorResponseModel,  # type: ignore
             data={"field": record_type, "error": error_type},
         )

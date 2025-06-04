@@ -18,7 +18,7 @@ from app.api.dependencies import (
     check_rate_limit,
     get_current_active_user,
 )
-from app.api.responses import default_error_responses
+from app.api.responses import default_error_responses, small_error_responses
 from app.api.utils import is_valid_email_dns
 from app.core.config import settings
 from app.core.security import (
@@ -194,7 +194,11 @@ async def login(
     }
 
 
-@router.post("/refresh-token", response_model=AccessTokenOnly)
+@router.post(
+    "/refresh-token",
+    response_model=AccessTokenOnly,
+    responses=default_error_responses,
+)
 async def refresh_token(data: RefreshRequest) -> dict:
     token = data.refresh_token
 
@@ -210,8 +214,7 @@ async def refresh_token(data: RefreshRequest) -> dict:
 
 
 @router.get(
-    "/me",
-    summary="Get authenticated user information",
+    "/me", summary="Get authenticated user information", response_model=UserSchema, responses=small_error_responses
 )
 async def get_me(
     current_user: User = Depends(get_current_active_user),
@@ -233,7 +236,9 @@ async def get_me(
 
 @router.get(
     "/notif-setting",
-    summary="Get notif",
+    summary="Get notification setting",
+    response_model=NotifSettingUpdate,
+    responses=small_error_responses,
 )
 async def get_notif_setting(
     current_user: User = Depends(get_current_active_user),
@@ -249,6 +254,8 @@ async def get_notif_setting(
 @router.put(
     "/notif-setting",
     summary="Update notification setting",
+    response_model=NotifSettingUpdate,
+    responses=default_error_responses,
 )
 async def update_notif_setting(
     setting_data: NotifSettingUpdate,

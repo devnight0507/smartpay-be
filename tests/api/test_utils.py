@@ -85,14 +85,12 @@ def test_create_response_with_data_model():
 
 def test_create_response_with_error_model():
     result = utils.create_response(
-        data={"error": "details"},
+        data="error detail",
         message_key="error-occurred",
         response_model=ErrorResponseModel,
     )
     result_dict = result.dict()
-    assert result_dict["code"] == ResponseCode.ERROR
-    assert result_dict["message"] == "translated-error-occurred"
-    assert result_dict["details"] == {"error": "details"}
+    assert result_dict["detail"] == "error detail"
 
 
 class CustomBaseResponse(BaseResponseModel):

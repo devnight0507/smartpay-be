@@ -104,7 +104,7 @@ def create_response(
     # If a response model is specified
     if issubclass(response_model, DataResponseModel):
         # Create a data response
-        response_data = response_model(
+        response_data = response_model(  # type: ignore
             code=ResponseCode.SUCCESS,
             message=translated_message,
             data=data,
@@ -113,14 +113,12 @@ def create_response(
     elif issubclass(response_model, ErrorResponseModel):
         # Create an error response
         error_response = response_model(
-            code=ResponseCode.ERROR,
-            message=translated_message,
-            details=data,
+            detail=data,
         )
-        return cast(Dict[str, Any], error_response)
+        return cast(Any, error_response)
     else:
         # Create a base response
-        base_response = response_model(
+        base_response = response_model(  # type: ignore
             code=ResponseCode.SUCCESS if status_code < 400 else ResponseCode.ERROR,
             message=translated_message,
         )

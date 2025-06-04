@@ -32,7 +32,11 @@ from app.schemas.schemas import UserActiveResponseUpdate
 router = APIRouter()
 
 
-@router.get("/users", response_model=List[UserSchema])
+@router.get(
+    "/users",
+    response_model=List[UserSchema],
+    responses=default_error_responses,
+)
 async def get_users(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin),  # Check if user is admin
@@ -124,7 +128,7 @@ async def update_user_password(
         raise HTTPException(status_code=500, detail=f"Failed to update password: {str(e)}")
 
 
-@router.get("/transactions/summary", response_model=AdminTransactionSummary)
+@router.get("/transactions/summary", response_model=AdminTransactionSummary, responses=default_error_responses)
 async def get_admin_transaction_summary(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin),
@@ -204,7 +208,7 @@ async def get_admin_transaction_summary(
     )
 
 
-@router.get("/balances/summary", response_model=BalanceSummaryResponse)
+@router.get("/balances/summary", response_model=BalanceSummaryResponse, responses=default_error_responses)
 async def get_balance_summary(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin),

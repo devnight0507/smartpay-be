@@ -99,12 +99,10 @@ class ResponseMessage:
         return self.message
 
 
-class ErrorDetail(BaseModel):
-    """Detail for a specific error in a validation error."""
+class MessageModel(BaseModel):
+    """Model for standardized messages in API responses."""
 
-    loc: List[str] = Field(..., description="Location of the error")
-    msg: str = Field(..., description="Error message")
-    type: str = Field(..., description="Error type")
+    message: str = Field(..., description="The message content")
 
 
 class BaseResponseModel(BaseModel):
@@ -112,6 +110,7 @@ class BaseResponseModel(BaseModel):
 
     code: ResponseCode = Field(..., description="Response code")
     message: str = Field(..., description="Response message")
+    detail: Optional[str] = Field(None, description="Additional details about the response")
 
 
 class DataResponseModel(BaseResponseModel, Generic[T]):
@@ -120,94 +119,10 @@ class DataResponseModel(BaseResponseModel, Generic[T]):
     data: T = Field(..., description="Response data")
 
 
-class ErrorResponseModel(BaseResponseModel):
+class ErrorResponseModel(BaseModel):
     """Base model for error responses."""
 
-    details: Optional[Any] = Field(None, description="Additional error details")
-
-
-class ValidationErrorModel(ErrorResponseModel):
-    """Model for validation error responses."""
-
-    code: ResponseCode = Field(ResponseCode.VALIDATION_ERROR, description="Validation error code")
-    details: List[ErrorDetail] = Field(..., description="Validation error details")
-    message: str = Field(ResponseMessage("ValidationError").message, description="Validation error message")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "code": "validation_error",
-                "message": "One or more fields failed validation.",
-                "details": [
-                    {
-                        "loc": ["body", "email"],
-                        "msg": "value is not a valid email address",
-                        "type": "value_error.email",
-                    }
-                ],
-            }
-        }
-
-
-class NotFoundModel(ErrorResponseModel):
-    """Model for not found error responses."""
-
-    code: ResponseCode = Field(ResponseCode.NOT_FOUND, description="Not found error code")
-
-
-class NoContentsFoundModel(NotFoundModel):
-    """Model for no contents found error responses."""
-
-    message: str = Field(
-        ResponseMessage("NoContentsFound", {"content": "records"}).message, description="No contents found message"
-    )
-
-
-class ForbiddenModel(ErrorResponseModel):
-    """Model for forbidden error responses."""
-
-    code: ResponseCode = Field(ResponseCode.AUTHORIZATION_ERROR, description="Authorization error code")
-
-
-class JWTMalformedForbiddenModel(ForbiddenModel):
-    """Model for JWT malformed forbidden error responses."""
-
-    message: str = Field(ResponseMessage("JWTMalformedForbidden").message, description="JWT malformed message")
-
-
-class InvalidAuthCredForbiddenModel(ForbiddenModel):
-    """Model for invalid auth credentials forbidden error responses."""
-
-    message: str = Field(
-        ResponseMessage("InvalidAuthCredForbidden").message, description="Invalid auth credentials message"
-    )
-
-
-class AgentNotExistsForbiddenModel(ForbiddenModel):
-    """Model for agent not exists forbidden error responses."""
-
-    message: str = Field(ResponseMessage("AgentNotExistsForbidden").message, description="Agent not exists message")
-
-
-class BadRequestModel(ErrorResponseModel):
-    """Model for bad request error responses."""
-
-    code: ResponseCode = Field(ResponseCode.ERROR, description="Bad request error code")
-
-
-class AgentHasProcessingJobsModel(BadRequestModel):
-    """Model for agent has processing jobs error responses."""
-
-    message: str = Field(
-        ResponseMessage("AgentHasProcessingJobs").message, description="Agent has processing jobs message"
-    )
-
-
-class InternalErrorModel(ErrorResponseModel):
-    """Model for internal server error responses."""
-
-    code: ResponseCode = Field(ResponseCode.INTERNAL_ERROR, description="Internal error code")
-    message: str = Field(ResponseMessage("InternalError").message, description="Internal error message")
+    detail: str = Field(..., description="Additional error details")
 
 
 # Export HTTP status codes for easier route definitions
@@ -231,26 +146,43 @@ class Tags:
     WEBSOCKETS = "WebSockets"
 
 
-# Define common response messages for use in API responses
+# Define common response messages for use in API responses in the MVP version.
+# This pattern should be improved in the future to use a more dynamic translation system.
 default_error_responses: dict[int | str, dict[str, Any]] | None = {
     HTTP_400_BAD_REQUEST: {
-        "model": BadRequestModel,
+        "model": ErrorResponseModel,
         "description": "Bad Request – Invalid input or logic error",
     },
     HTTP_401_UNAUTHORIZED: {
-        "model": InvalidAuthCredForbiddenModel,
+        "model": ErrorResponseModel,
         "description": "Unauthorized – Invalid or missing authentication",
     },
     HTTP_403_FORBIDDEN: {
-        "model": JWTMalformedForbiddenModel,
+        "model": ErrorResponseModel,
         "description": "Forbidden – Auth token malformed or access denied",
     },
     HTTP_422_UNPROCESSABLE_ENTITY: {
-        "model": ValidationErrorModel,
+        "model": ErrorResponseModel,
         "description": "Validation Error – Input validation failed",
     },
     HTTP_500_INTERNAL_SERVER_ERROR: {
-        "model": InternalErrorModel,
+        "model": ErrorResponseModel,
+        "description": "Internal Error – Unexpected server failure",
+    },
+}
+
+
+small_error_responses: dict[int | str, dict[str, Any]] | None = {
+    HTTP_400_BAD_REQUEST: {
+        "model": ErrorResponseModel,
+        "description": "Bad Request – Invalid input or logic error",
+    },
+    HTTP_401_UNAUTHORIZED: {
+        "model": ErrorResponseModel,
+        "description": "Unauthorized – Invalid or missing authentication",
+    },
+    HTTP_500_INTERNAL_SERVER_ERROR: {
+        "model": ErrorResponseModel,
         "description": "Internal Error – Unexpected server failure",
     },
 }

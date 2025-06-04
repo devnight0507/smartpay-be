@@ -2,7 +2,7 @@
 API error handling for consistent error responses across the application.
 """
 
-from typing import Any, Dict, Optional
+from typing import Dict
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -15,15 +15,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 class ErrorResponse(BaseModel):
     """Standardized error response model."""
 
-    error: Dict[str, Any]
-
-
-class ErrorDetail(BaseModel):
-    """Error detail model."""
-
-    code: str
-    message: str
-    details: Optional[Dict[str, Any]] = None
+    detail: str
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -46,7 +38,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         flat_errors = [flatten_error(err) for err in exc.errors()]
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"details": " | ".join(flat_errors)},
+            content={"detail": " | ".join(flat_errors)},
         )
 
     @app.exception_handler(IntegrityError)
@@ -58,11 +50,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={
-                "error": {
-                    "code": "DATABASE_INTEGRITY_ERROR",
-                    "message": "Database constraint violation",
-                    "details": {"error": str(exc)},
-                }
+                "detail": str(exc),
             },
         )
 
@@ -74,13 +62,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.error(f"Database error: {str(exc)}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "error": {
-                    "code": "DATABASE_ERROR",
-                    "message": "A database error occurred",
-                    "details": {"error": str(exc)},
-                }
-            },
+            content={"detail": str(exc)},
         )
 
     @app.exception_handler(Exception)
@@ -91,20 +73,12 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.exception(f"Unhandled exception: {str(exc)}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": "An unexpected error occurred",
-                    "details": {"error": str(exc)},
-                }
-            },
+            content={"detail": str(exc)},
         )
 
 
-def create_error_response(
-    error_code: str, message: str, details: Optional[Dict[str, Any]] = None
-) -> Dict[str, Dict[str, Any]]:
+def create_error_response(error_code: str, message: str, detail: str) -> Dict[str, str]:
     """
     Create a standardized error response.
     """
-    return {"error": {"code": error_code, "message": message, "details": details}}
+    return {"detail": detail}
