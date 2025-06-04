@@ -130,7 +130,7 @@ class SimpleUser(BaseModel):
 
     id: UUID
     fullname: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Union[EmailStr, None, str] = None
     phone: Optional[str] = None
 
     class Config:
