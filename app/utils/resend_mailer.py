@@ -1,30 +1,22 @@
-import os
 import smtplib
 from email.message import EmailMessage
 
-# import logging
 import resend
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.config import settings
 
-MAIL_MODE = os.getenv("MAIL_MODE", "dev")
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-# EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
-# APP_PASSWORD = os.getenv("APP_PASSWORD")
-
-resend.api_key = RESEND_API_KEY  # Always set it
+resend.api_key = settings.RESEND_API_KEY  # Always set it
 
 
 async def send_verification_code(to_email: str, code: str) -> dict:
-    if MAIL_MODE == "prod":
+    if settings.MAIL_MODE == "prod":
         params = {
-            "from": "onboarding@resend.dev",
+            "from": f"no-reply@{settings.RESEND_DOMAIN}",
             "to": [to_email],
             "subject": "Your SmartPay Verification Code",
             "html": f"<p>Your verification code is: <strong>{code}</strong></p>",
         }
-        return resend.Emails.send(params).__dict__  # type: ignore[arg-type]
+        return resend.Emails.send(params)  # type: ignore
 
     else:
         msg = EmailMessage()

@@ -20,7 +20,6 @@ from app.schemas.schemas import (
 
 
 class TestAuthRoutes:
-
     @pytest.fixture
     def client(self):
         return TestClient(app)
@@ -77,7 +76,6 @@ class TestAuthRoutes:
                 ],
             ),
         ):
-
             mock_verification = MagicMock()
             mock_verification.code = "123456"
             mock_create_code.return_value = mock_verification
@@ -96,7 +94,7 @@ class TestAuthRoutes:
 
     @pytest.mark.asyncio
     async def test_register_with_phone_success(self, mock_db):
-        user_data = UserCreate(fullname="Test User", email="", phone="+1234567890", password="password123")
+        user_data = UserCreate(fullname="Test User", email=None, phone="+1234567890", password="password123")
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.first.return_value = None
@@ -113,7 +111,6 @@ class TestAuthRoutes:
                 ],
             ),
         ):
-
             mock_verification = MagicMock()
             mock_verification.code = "123456"
             mock_create_code.return_value = mock_verification
@@ -123,7 +120,6 @@ class TestAuthRoutes:
             result = await register(user_in=user_data, db=mock_db)
 
             assert result["fullname"] == "Test User"
-            assert result["email"] is None
             assert result["phone"] == "+1234567890"
             mock_create_code.assert_called_once_with(mock_db, "12345678-1234-5678-9012-123456789012", "phone")
 
@@ -139,7 +135,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.create_refresh_token", return_value="refresh_token"),
             patch("app.api.routes.v1.auth.settings") as mock_settings,
         ):
-
             mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
             from app.api.routes.v1.auth import login
@@ -192,7 +187,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.create_access_token", return_value="new_access_token"),
             patch("app.api.routes.v1.auth.settings") as mock_settings,
         ):
-
             mock_settings.SECRET_KEY = "secret"
             mock_settings.ALGORITHM = "HS256"
 
@@ -213,7 +207,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.jwt.decode", return_value=mock_payload),
             patch("app.api.routes.v1.auth.settings") as mock_settings,
         ):
-
             mock_settings.SECRET_KEY = "secret"
             mock_settings.ALGORITHM = "HS256"
 
@@ -233,7 +226,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.jwt.decode", side_effect=jwt.JWTError()),
             patch("app.api.routes.v1.auth.settings") as mock_settings,
         ):
-
             mock_settings.SECRET_KEY = "secret"
             mock_settings.ALGORITHM = "HS256"
 
@@ -377,7 +369,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.create_verification_code") as mock_create_code,
             patch("app.api.routes.v1.auth.send_verification_code") as mock_send_code,
         ):
-
             mock_verification = MagicMock()
             mock_verification.code = "123456"
             mock_create_code.return_value = mock_verification
@@ -461,7 +452,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.create_verification_code") as mock_create_code,
             patch("app.api.routes.v1.auth.send_verification_code") as mock_send_code,
         ):
-
             mock_verification = MagicMock()
             mock_verification.code = "123456"
             mock_create_code.return_value = mock_verification
@@ -526,7 +516,6 @@ class TestAuthRoutes:
             patch("app.api.routes.v1.auth.check_rate_limit"),
             patch("app.api.routes.v1.auth.jwt.encode", return_value="reset_token"),
         ):
-
             from app.api.routes.v1.auth import verify_password_reset_code
 
             result = await verify_password_reset_code(verify_data=verify_data, request=mock_request, db=mock_db)

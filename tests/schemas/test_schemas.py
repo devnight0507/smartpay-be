@@ -9,22 +9,22 @@ from app.schemas import schemas
 
 def test_user_base_email_and_phone_validation():
     # Valid: only email
-    user1 = schemas.UserBase(email="test@example.com")
+    user1 = schemas.UserBase(fullname="Full Name", email="test@example.com")
     assert user1.email == "test@example.com"
 
     # Valid: only phone
-    user2 = schemas.UserBase(phone="123456789")
-    assert user2.phone == "123456789"
+    user2 = schemas.UserBase(fullname="Full Name", phone="+1234567890")
+    assert user2.phone == "+1234567890"
 
     # Invalid: neither email nor phone
     with pytest.raises(ValidationError) as exc:
-        schemas.UserBase(email=None, phone=None)
+        schemas.UserBase(fullname="Full Name", email=None, phone=None)
 
     assert "Either email or phone must be provided" in str(exc.value)
 
     # Empty string test (normalized to None, then fails)
     with pytest.raises(ValidationError):
-        schemas.UserBase(email="", phone="")
+        schemas.UserBase(fullname="John", email="", phone="")
 
 
 def test_user_create_password_min_length():
@@ -81,6 +81,7 @@ def test_payment_card_update_strip_name():
 
 def test_user_in_db_base_orm_mode():
     user = schemas.UserInDBBase(
+        fullname="Test User",
         id=uuid4(),
         email="test@example.com",
         created_at=datetime.now(),

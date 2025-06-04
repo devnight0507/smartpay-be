@@ -2,8 +2,10 @@
 API utility functions.
 """
 
+import re
 from typing import Any, Dict, Optional, Type, TypeVar, Union, cast
 
+import dns.resolver
 from fastapi import Response, status
 
 from app.api.middleware import get_request_language
@@ -14,6 +16,7 @@ from app.api.responses import (
     ResponseCode,
     ResponseMessage,
 )
+from app.schemas.schemas import CardValidation
 
 T = TypeVar("T")
 
@@ -122,3 +125,56 @@ def create_response(
             message=translated_message,
         )
         return cast(Dict[str, Any], base_response)
+
+
+EMAIL_REGEX = re.compile(r"^[^@]+@([^@]+\.[^@]+)$")
+
+
+def is_valid_email_dns(email: str) -> bool:
+    match = EMAIL_REGEX.match(email)
+    if not match:
+        return False
+
+    domain = match.group(1)
+
+    try:
+        # Check for MX records
+        answers = dns.resolver.resolve(domain, "MX")
+        return len(answers) > 0
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout):
+        return False
+
+
+def luhn_checksum(card_number: str) -> bool:
+    """Check if card number passes the Luhn algorithm."""
+    digits = [int(d) for d in card_number if d.isdigit()]
+    checksum = 0
+
+    for i, digit in enumerate(reversed(digits)):
+        if i % 2 == 1:
+            digit *= 2
+            if digit > 9:
+                digit -= 9
+        checksum += digit
+
+    return checksum % 10 == 0
+
+
+def get_card_type(card_number: str) -> str:
+    """Return the type of card (Visa, MasterCard, etc.) based on IIN range."""
+    if re.match(r"^4[0-9]{12}(?:[0-9]{3})?$", card_number):
+        return "Visa"
+    elif re.match(r"^5[1-5][0-9]{14}$", card_number):
+        return "MasterCard"
+    elif re.match(r"^3[47][0-9]{13}$", card_number):
+        return "American Express"
+    elif re.match(r"^6(?:011|5[0-9]{2})[0-9]{12}$", card_number):
+        return "Discover"
+    else:
+        return "Unknown"
+
+
+def is_valid_card(card_number: str) -> CardValidation:
+    card_number = card_number.replace(" ", "").replace("-", "")
+    is_valid = card_number.isdigit() and luhn_checksum(card_number)
+    return CardValidation(valid=is_valid, card_type=get_card_type(card_number), length=len(card_number))

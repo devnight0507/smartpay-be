@@ -89,7 +89,6 @@ async def toggle_user_active(
         raise
     except Exception as e:
         await db.rollback()
-        print(f"Error in toggle_user_active: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to update user status: {str(e)}"
         )

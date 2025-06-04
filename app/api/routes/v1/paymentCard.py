@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.api.dependencies import get_current_active_user
+from app.api.utils import is_valid_card
 from app.db.models.models import PaymentCard, User
 from app.db.session import get_db
 from app.schemas.schemas import MessageResponse, PaymentCardCreate, PaymentCardResponse
@@ -82,7 +83,12 @@ async def add_new_card(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CVC is required",
         )
-
+    card_validation = is_valid_card(card_number=card_in.cardNumber)
+    if not card_validation.valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid card number or type does not match",
+        )
     # Check if this is the first card (should be default automatically)
     query = select(PaymentCard).where(PaymentCard.user_id == current_user.id, PaymentCard.is_deleted.is_(False))
     result = await db.execute(query)
