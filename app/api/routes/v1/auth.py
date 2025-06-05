@@ -224,6 +224,7 @@ async def get_me(
 
     return {
         "id": current_user.id,
+        "fullname": current_user.fullname,
         "email": current_user.email,
         "phone": current_user.phone,
         "is_active": current_user.is_active,
